@@ -2,14 +2,17 @@
 
 import * as React from "react";
 import { useSession } from "next-auth/react";
+import { SelectionFlag } from "@/components/selection-flag";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   formatOfficialCode,
   selectionForNumber,
+  stickerCount,
 } from "@/data/selections";
 import type { MemberDuplicate } from "@/app/actions/albums";
 import { TradeRequestDialog } from "@/components/gallery/trade-request-dialog";
+import { groupBySelection } from "@/lib/sticker-groups";
 
 type GalleryDuplicatesFeedProps = {
   albumId: string;
@@ -37,15 +40,10 @@ export function GalleryDuplicatesFeed({
     [duplicates, session?.user?.id],
   );
 
-  const grouped = React.useMemo(() => {
-    const map = new Map<string, MemberDuplicate[]>();
-    for (const d of othersOnly) {
-      const list = map.get(d.userId) ?? [];
-      list.push(d);
-      map.set(d.userId, list);
-    }
-    return map;
-  }, [othersOnly]);
+  const groups = React.useMemo(
+    () => groupBySelection(othersOnly, (d) => d.stickerNumber),
+    [othersOnly],
+  );
 
   if (othersOnly.length === 0) {
     return (
@@ -57,45 +55,75 @@ export function GalleryDuplicatesFeed({
 
   return (
     <>
-      <div className="flex flex-col gap-4">
-        {Array.from(grouped.entries()).map(([userId, items]) => (
-          <div key={userId} className="rounded-2xl border border-border p-4">
-            <p className="mb-3 font-semibold text-foreground">{items[0].name}</p>
-            <div className="flex flex-wrap gap-2">
-              {items.map((item) => {
-                const sel = selectionForNumber(item.stickerNumber);
-                const label = sel
-                  ? formatOfficialCode(sel, item.stickerNumber)
-                  : `#${item.stickerNumber}`;
+      <div className="flex flex-col gap-6">
+        {groups.map(({ selection, items }) => {
+          const total = stickerCount(selection);
+          const uniqueStickers = new Set(items.map((i) => i.stickerNumber)).size;
 
-                return (
-                  <div
-                    key={`${userId}-${item.stickerNumber}`}
-                    className="flex items-center gap-1 rounded-lg border border-border bg-card-muted px-2 py-1"
-                  >
-                    <Badge variant="secondary">
-                      {label} ×{item.duplicateCount}
-                    </Badge>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-7 px-2 text-xs"
-                      onClick={() =>
-                        setTradeTarget({
-                          targetUserId: userId,
-                          targetName: item.name,
-                          stickerNumber: item.stickerNumber,
-                        })
-                      }
+          return (
+            <section key={selection.id} className="scroll-mt-32">
+              <header className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
+                <SelectionFlag selection={selection} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-foreground sm:text-base">
+                    {selection.name}
+                  </h3>
+                  <p className="text-xs text-muted">
+                    {selection.versoPrefix === "00"
+                      ? "Logo Panini"
+                      : selection.versoPrefix === "FWC"
+                        ? "FWC 1–19"
+                        : `${selection.versoPrefix} 1–${total}`}
+                  </p>
+                </div>
+                <Badge variant="secondary" className="shrink-0 tabular-nums text-xs">
+                  {uniqueStickers} {uniqueStickers === 1 ? "repetida" : "repetidas"}
+                </Badge>
+              </header>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((item) => {
+                  const sel = selectionForNumber(item.stickerNumber);
+                  const label = sel
+                    ? formatOfficialCode(sel, item.stickerNumber)
+                    : `#${item.stickerNumber}`;
+
+                  return (
+                    <div
+                      key={`${item.userId}-${item.stickerNumber}`}
+                      className="flex items-center gap-2 rounded-lg border border-border bg-card-muted px-3 py-2"
                     >
-                      Trocar
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          {label}{" "}
+                          <span className="font-normal text-muted">
+                            ×{item.duplicateCount}
+                          </span>
+                        </p>
+                        <p className="truncate text-xs text-muted">{item.name}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 rounded-lg"
+                        onClick={() =>
+                          setTradeTarget({
+                            targetUserId: item.userId,
+                            targetName: item.name,
+                            stickerNumber: item.stickerNumber,
+                          })
+                        }
+                      >
+                        Trocar
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          );
+        })}
       </div>
 
       {tradeTarget && (
