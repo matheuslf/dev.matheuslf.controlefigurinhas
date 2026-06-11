@@ -141,9 +141,7 @@ export function AlbumClient() {
           ),
         );
       });
-      getMemberDuplicates(activeAlbumId, filterNeededOnly, {
-        includeSelf: true,
-      }).then(setMemberDuplicates);
+      getMemberDuplicates(activeAlbumId, filterNeededOnly).then(setMemberDuplicates);
       return;
     }
 
@@ -474,8 +472,8 @@ export function AlbumClient() {
                   <CardHeader>
                     <CardTitle>Repetidas do álbum</CardTitle>
                     <CardDescription>
-                      Repetidas publicadas por todos os membros — incluindo as que
-                      você ainda não tem.
+                      Repetidas publicadas por outros membros do álbum para
+                      troca.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>

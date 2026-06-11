@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthModal } from "@/components/auth/auth-modal-context";
 import { AlbumShareHeaderActions } from "@/components/albums/album-share-header-actions";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -16,12 +17,25 @@ export function SiteHeader() {
     <header className="sticky top-0 z-40 border-b border-border bg-[var(--header-bg)] backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2 font-semibold text-foreground">
+          <Image
+            src="/logo.png"
+            alt="Copa 2026"
+            width={36}
+            height={36}
+            className="h-9 w-9 object-contain"
+          />
           <span className="text-lg">Copa 2026</span>
           <Badge variant="secondary" className="hidden sm:inline-flex">
             Álbum
           </Badge>
         </Link>
         <nav className="flex items-center gap-1 text-xs font-medium sm:gap-1.5 sm:text-sm">
+          <Link
+            href="/gallery"
+            className="hidden rounded-md px-2 py-1 text-muted hover:bg-card hover:text-foreground sm:inline"
+          >
+            Galeria
+          </Link>
           <Link
             href="/albums"
             className="hidden rounded-md px-2 py-1 text-muted hover:bg-card hover:text-foreground sm:inline"
@@ -38,6 +52,12 @@ export function SiteHeader() {
           <ThemeToggle />
           {status === "authenticated" ? (
             <>
+              <Link
+                href="/trades"
+                className="hidden rounded-md px-2 py-1 text-muted hover:bg-card hover:text-foreground sm:inline"
+              >
+                Trocas
+              </Link>
               <Link
                 href="/profile"
                 className="hidden rounded-md px-2 py-1 text-muted hover:bg-card hover:text-foreground sm:inline"

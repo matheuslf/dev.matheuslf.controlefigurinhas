@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { BookOpenCheck, LayoutGrid, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
@@ -11,32 +12,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { SiteFooter } from "@/components/site-footer";
 import { TOTAL_STICKERS } from "@/data/selections";
 
-function MockSticker({
-  n,
-  owned,
-}: {
-  n: number;
-  owned: boolean;
-}) {
-  return (
-    <div
-      className={
-        owned
-          ? "flex h-12 items-center justify-center rounded-2xl border-2 border-success bg-success text-sm font-bold text-white shadow-[var(--shadow-1)]"
-          : "flex h-12 items-center justify-center rounded-2xl border-2 border-border bg-card-muted text-sm font-semibold text-foreground"
-      }
-    >
-      {n}
-    </div>
-  );
-}
-
 export default function HomePage() {
-  const previewOwned = new Set([1, 2, 5, 8, 13, 21, 34]);
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader />
@@ -70,32 +49,20 @@ export default function HomePage() {
               </p>
             </div>
 
-            <Card
+            <div
               id="preview"
-              className="scroll-mt-24 overflow-hidden shadow-[var(--shadow-3)] lg:max-w-lg lg:justify-self-end"
+              className="scroll-mt-24 flex items-center justify-center lg:max-w-lg lg:justify-self-end"
             >
-              <CardHeader className="border-b border-border bg-card-muted pb-4">
-                <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="text-lg">Prévia do álbum</CardTitle>
-                  <Badge variant="success">Ao vivo</Badge>
-                </div>
-                <CardDescription>Toque para marcar — assim no app</CardDescription>
-                <div className="pt-2">
-                  <div className="mb-2 flex justify-between text-sm text-muted">
-                    <span>Progresso</span>
-                    <span className="font-medium text-foreground">7 / 24</span>
-                  </div>
-                  <Progress value={29} />
-                </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
-                  {Array.from({ length: 24 }, (_, i) => i + 1).map((n) => (
-                    <MockSticker key={n} n={n} owned={previewOwned.has(n)} />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+              <Image
+                src="/logo.gif"
+                alt="Copa do Mundo FIFA 2026"
+                width={400}
+                height={400}
+                className="h-auto w-full max-w-sm rounded-2xl shadow-[var(--shadow-3)]"
+                unoptimized
+                priority
+              />
+            </div>
           </div>
         </section>
 
@@ -189,10 +156,7 @@ export default function HomePage() {
         </section>
       </main>
 
-      <footer className="border-t border-border bg-card-muted py-8 text-center text-sm text-muted">
-        Figurinhas Copa 2026 — uso familiar. Dados salvos localmente; com login,
-        sincronizados na sua conta.
-      </footer>
+      <SiteFooter />
       <GoogleOneTap />
     </div>
   );

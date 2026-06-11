@@ -20,8 +20,13 @@ import {
   promoteToOwner,
   regenerateInviteToken,
   renameAlbum,
+  setAlbumPublic,
 } from "@/app/actions/albums";
 import { buildAlbumInviteUrl } from "@/lib/album-invite";
+import {
+  getAlbumVisitorStats,
+  type AlbumVisitorStats,
+} from "@/app/actions/gallery";
 
 type AlbumSettingsClientProps = {
   albumId: string;
@@ -40,14 +45,22 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
   const [loading, setLoading] = React.useState(true);
   const [leaveError, setLeaveError] = React.useState<string | null>(null);
   const [leaving, setLeaving] = React.useState(false);
+  const [visitorStats, setVisitorStats] = React.useState<AlbumVisitorStats | null>(
+    null,
+  );
 
   React.useEffect(() => {
-    Promise.all([getAlbumById(albumId), getAlbumMembers(albumId)])
-      .then(([a, m]) => {
+    Promise.all([
+      getAlbumById(albumId),
+      getAlbumMembers(albumId),
+      getAlbumVisitorStats(albumId),
+    ])
+      .then(([a, m, stats]) => {
         setAlbum(a);
         setMembers(m);
         setName(a.name);
         setInviteUrl(buildAlbumInviteUrl(a.inviteToken, "member"));
+        setVisitorStats(stats);
       })
       .finally(() => setLoading(false));
   }, [albumId]);
@@ -101,6 +114,33 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
         {isOwner && (
           <Card>
             <CardHeader>
+              <CardTitle>Visibilidade na galeria</CardTitle>
+              <CardDescription>
+                Álbuns públicos aparecem na galeria para outros colecionadores
+                solicitarem trocas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <label className="flex cursor-pointer items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={album.isPublic}
+                  onChange={async (e) => {
+                    await setAlbumPublic(albumId, e.target.checked);
+                    const a = await getAlbumById(albumId);
+                    setAlbum(a);
+                  }}
+                  className="h-4 w-4 rounded border-border"
+                />
+                Exibir na galeria pública
+              </label>
+            </CardContent>
+          </Card>
+        )}
+
+        {isOwner && (
+          <Card>
+            <CardHeader>
               <CardTitle>Renomear álbum</CardTitle>
             </CardHeader>
             <CardContent>
@@ -144,6 +184,10 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
         <Card>
           <CardHeader>
             <CardTitle>Membros ({members.length})</CardTitle>
+            <CardDescription>
+              Pessoas que participam do álbum. Visitantes da galeria não
+              aparecem aqui.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {members.map((m) => (
@@ -174,6 +218,43 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
             ))}
           </CardContent>
         </Card>
+
+        {isOwner && visitorStats && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Popularidade e visitantes</CardTitle>
+              <CardDescription>
+                {visitorStats.viewCount} acessos totais ·{" "}
+                {visitorStats.uniqueVisitors} visitantes únicos na galeria
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {visitorStats.visitors.length === 0 ? (
+                <p className="text-sm text-muted">
+                  Nenhum visitante registrado ainda.
+                </p>
+              ) : (
+                visitorStats.visitors.map((visitor) => (
+                  <div
+                    key={visitor.userId}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{visitor.name}</p>
+                      <p className="text-xs text-muted">
+                        {visitor.visitCount}{" "}
+                        {visitor.visitCount === 1 ? "visita" : "visitas"} ·
+                        última{" "}
+                        {new Date(visitor.lastVisitedAt).toLocaleString("pt-BR")}
+                      </p>
+                    </div>
+                    <Badge variant="outline">Visitante</Badge>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex flex-col gap-2">
           {mustPromoteFirst && (

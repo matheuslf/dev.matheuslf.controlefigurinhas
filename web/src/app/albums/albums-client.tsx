@@ -104,6 +104,9 @@ export function AlbumsClient() {
                     <Link href={`/album?albumId=${album.id}`}>Abrir álbum</Link>
                   </Button>
                   <Button asChild variant="ghost" className="min-h-10 rounded-lg px-3 text-sm">
+                    <Link href={`/gallery/${album.id}`}>Ver na galeria</Link>
+                  </Button>
+                  <Button asChild variant="ghost" className="min-h-10 rounded-lg px-3 text-sm">
                     <Link href={`/albums/${album.id}/settings`}>Configurações</Link>
                   </Button>
                 </CardContent>
