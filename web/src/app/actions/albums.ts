@@ -275,13 +275,25 @@ export async function leaveAlbum(albumId: string) {
     const ownerCount = await prisma.albumMember.count({
       where: { albumId, role: "OWNER" },
     });
-    if (ownerCount <= 1) throw new Error("Transfer ownership before leaving");
+    if (ownerCount <= 1) {
+      const memberCount = await prisma.albumMember.count({
+        where: { albumId },
+      });
+      if (memberCount <= 1) {
+        await prisma.album.delete({ where: { id: albumId } });
+        revalidatePath("/albums");
+        revalidatePath("/album");
+        return;
+      }
+      throw new Error("Promova outro membro a dono antes de sair.");
+    }
   }
 
   await prisma.albumMember.delete({
     where: { albumId_userId: { albumId, userId } },
   });
   revalidatePath("/albums");
+  revalidatePath("/album");
 }
 
 export async function renameAlbum(albumId: string, name: string) {
@@ -363,6 +375,52 @@ export async function getAlbumGroupProgress(albumId: string) {
   return [...new Set(stickers.map((s) => s.stickerNumber))].sort((a, b) => a - b);
 }
 
+export type AlbumSharedSnapshot = {
+  owned: number[];
+  duplicateTotals: { stickerNumber: number; totalDuplicates: number }[];
+};
+
+export async function getAlbumSharedSnapshot(
+  albumId: string,
+): Promise<AlbumSharedSnapshot> {
+  const userId = await requireUserId();
+  await requireAlbumMember(albumId, userId);
+
+  const members = await prisma.albumMember.findMany({
+    where: { albumId },
+    select: { userId: true },
+  });
+  const memberIds = members.map((m) => m.userId);
+
+  const stickers = await prisma.userSticker.findMany({
+    where: { userId: { in: memberIds } },
+    select: { stickerNumber: true, owned: true, duplicateCount: true },
+  });
+
+  const ownedSet = new Set<number>();
+  const dupMap = new Map<number, number>();
+
+  for (const row of stickers) {
+    if (row.owned) ownedSet.add(row.stickerNumber);
+    if (row.duplicateCount > 0) {
+      dupMap.set(
+        row.stickerNumber,
+        (dupMap.get(row.stickerNumber) ?? 0) + row.duplicateCount,
+      );
+    }
+  }
+
+  return {
+    owned: [...ownedSet].sort((a, b) => a - b),
+    duplicateTotals: [...dupMap.entries()]
+      .map(([stickerNumber, totalDuplicates]) => ({
+        stickerNumber,
+        totalDuplicates,
+      }))
+      .sort((a, b) => a.stickerNumber - b.stickerNumber),
+  };
+}
+
 export type MemberDuplicate = {
   userId: string;
   name: string;
@@ -374,9 +432,11 @@ export type MemberDuplicate = {
 export async function getMemberDuplicates(
   albumId: string,
   filterNeededOnly = false,
+  options?: { includeSelf?: boolean },
 ): Promise<MemberDuplicate[]> {
   const userId = await requireUserId();
   await requireAlbumMember(albumId, userId);
+  const includeSelf = options?.includeSelf ?? false;
 
   const members = await prisma.albumMember.findMany({
     where: { albumId },
@@ -411,7 +471,7 @@ export async function getMemberDuplicates(
 
   const results: MemberDuplicate[] = [];
   for (const row of duplicates) {
-    if (row.userId === userId) continue;
+    if (!includeSelf && row.userId === userId) continue;
     if (filterNeededOnly && myOwned.has(row.stickerNumber)) continue;
     const user = userMap.get(row.userId);
     if (!user) continue;

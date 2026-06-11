@@ -36,13 +36,16 @@ import {
 } from "@/data/selections";
 import { useStickerCollection } from "@/hooks/use-sticker-collection";
 import {
+  getAlbumById,
   getAlbumGroupProgress,
+  getAlbumSharedSnapshot,
   getMemberDuplicates,
   listMyAlbums,
   type AlbumSummary,
   type MemberDuplicate,
 } from "@/app/actions/albums";
 import { duplicatesPublished } from "@/lib/sticker-storage";
+import type { StickerState } from "@/lib/sticker-storage";
 import { cn } from "@/lib/utils";
 
 const ALL = "all";
@@ -69,8 +72,11 @@ export function AlbumClient() {
   const [albums, setAlbums] = React.useState<AlbumSummary[]>([]);
   const [activeAlbumId, setActiveAlbumId] = React.useState<string | null>(null);
   const [groupOwned, setGroupOwned] = React.useState<Set<number>>(new Set());
+  const [groupDuplicateCounts, setGroupDuplicateCounts] = React.useState<
+    Map<number, number>
+  >(new Map());
   const [memberDuplicates, setMemberDuplicates] = React.useState<MemberDuplicate[]>([]);
-  const [filterNeededOnly, setFilterNeededOnly] = React.useState(true);
+  const [filterNeededOnly, setFilterNeededOnly] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState("list");
   const setAlbumShareTarget = useSetAlbumShareTarget();
 
@@ -81,14 +87,43 @@ export function AlbumClient() {
 
   const visibleNumbers = filter.numbers;
 
+  const isSharedAlbum = status === "authenticated" && activeAlbumId != null;
+  const activeAlbum = albums.find((a) => a.id === activeAlbumId);
+  const isAlbumOwner = activeAlbum?.role === "OWNER";
+  const isMemberOnlyView = isSharedAlbum && activeAlbum != null && !isAlbumOwner;
+
   React.useEffect(() => {
     if (status !== "authenticated") return;
-    listMyAlbums().then((list) => {
+    const fromUrl = searchParams.get("albumId");
+
+    listMyAlbums().then(async (list) => {
       setAlbums(list);
-      const fromUrl = searchParams.get("albumId");
-      if (fromUrl && list.some((a) => a.id === fromUrl)) {
-        setActiveAlbumId(fromUrl);
-      } else if (list.length > 0) {
+
+      if (fromUrl) {
+        if (list.some((a) => a.id === fromUrl)) {
+          setActiveAlbumId(fromUrl);
+          return;
+        }
+        try {
+          const album = await getAlbumById(fromUrl);
+          const summary: AlbumSummary = {
+            id: album.id,
+            name: album.name,
+            role: album.role,
+            memberCount: album.memberCount,
+            inviteToken: album.inviteToken,
+          };
+          setAlbums((prev) =>
+            prev.some((a) => a.id === summary.id) ? prev : [...prev, summary],
+          );
+          setActiveAlbumId(fromUrl);
+          return;
+        } catch {
+          // não é membro deste álbum
+        }
+      }
+
+      if (list.length > 0) {
         setActiveAlbumId(list[0].id);
       }
     });
@@ -96,9 +131,37 @@ export function AlbumClient() {
 
   React.useEffect(() => {
     if (!activeAlbumId || status !== "authenticated") return;
+
+    if (isMemberOnlyView) {
+      getAlbumSharedSnapshot(activeAlbumId).then((snap) => {
+        setGroupOwned(new Set(snap.owned));
+        setGroupDuplicateCounts(
+          new Map(
+            snap.duplicateTotals.map((d) => [d.stickerNumber, d.totalDuplicates]),
+          ),
+        );
+      });
+      getMemberDuplicates(activeAlbumId, filterNeededOnly, {
+        includeSelf: true,
+      }).then(setMemberDuplicates);
+      return;
+    }
+
     getAlbumGroupProgress(activeAlbumId).then((nums) => setGroupOwned(new Set(nums)));
     getMemberDuplicates(activeAlbumId, filterNeededOnly).then(setMemberDuplicates);
-  }, [activeAlbumId, status, filterNeededOnly, collection]);
+  }, [activeAlbumId, status, filterNeededOnly, collection, isMemberOnlyView]);
+
+  const getGroupState = React.useCallback(
+    (num: number): StickerState => ({
+      owned: groupOwned.has(num),
+      duplicateCount: groupDuplicateCounts.get(num) ?? 0,
+    }),
+    [groupOwned, groupDuplicateCounts],
+  );
+
+  const listOwned = isMemberOnlyView ? groupOwned : owned;
+  const listGetState = isMemberOnlyView ? getGroupState : getState;
+  const groupMissing = TOTAL_STICKERS - groupOwned.size;
 
   React.useEffect(() => {
     if (!search.trim()) return;
@@ -108,26 +171,34 @@ export function AlbumClient() {
   }, [filter.selectionId, search, selectionId]);
 
   React.useEffect(() => {
+    if (isMemberOnlyView && !["list", "duplicates"].includes(activeTab)) {
+      setActiveTab("list");
+    }
+  }, [isMemberOnlyView, activeTab]);
+
+  React.useEffect(() => {
     const target = filter.exactSticker;
     if (target == null) return;
-    setActiveTab("mark");
+    if (!isMemberOnlyView) {
+      setActiveTab("mark");
+    }
     const timer = window.setTimeout(() => {
       setFlash(target);
       document
-        .getElementById(`sticker-${target}`)
+        .getElementById(
+          isMemberOnlyView ? `list-sticker-${target}` : `sticker-${target}`,
+        )
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
       window.setTimeout(() => setFlash(null), 1400);
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [filter.exactSticker]);
+  }, [filter.exactSticker, isMemberOnlyView]);
 
   const missing = TOTAL_STICKERS - ownedCount;
   const hasActiveSearch = search.trim().length > 0;
   const publishedDuplicates = duplicatesPublished(collection);
   const groupPercent =
     Math.round((groupOwned.size / TOTAL_STICKERS) * 1000) / 10;
-  const isSharedAlbum = status === "authenticated" && activeAlbumId != null;
-  const activeAlbum = albums.find((a) => a.id === activeAlbumId);
 
   React.useEffect(() => {
     if (status !== "authenticated" || !activeAlbum) {
@@ -197,7 +268,7 @@ export function AlbumClient() {
         <div className="flex flex-col gap-2 max-sm:hidden">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Meu álbum
+              {isMemberOnlyView && activeAlbum ? activeAlbum.name : "Meu álbum"}
             </h1>
             {syncLabel && (
               <Badge variant="secondary" className="max-w-xs text-xs">
@@ -206,8 +277,9 @@ export function AlbumClient() {
             )}
           </div>
           <p className="text-base text-muted max-sm:hidden">
-            Use Listar para ver o álbum por país. Em Marcar, toque para marcar;
-            duplo clique ou segure para repetidas.
+            {isMemberOnlyView
+              ? "Veja o que o grupo já colou no álbum e as repetidas disponíveis para trocar."
+              : "Use Listar para ver o álbum por país. Em Marcar, toque para marcar; duplo clique ou segure para repetidas."}
           </p>
           {status === "authenticated" && albums.length > 0 && (
             <AlbumSwitcher
@@ -222,17 +294,24 @@ export function AlbumClient() {
           <CardHeader className="gap-4 pb-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <CardTitle className="text-lg sm:text-xl">Progresso geral</CardTitle>
+                <CardTitle className="text-lg sm:text-xl">
+                  {isMemberOnlyView ? "Progresso do álbum" : "Progresso geral"}
+                </CardTitle>
                 <CardDescription>
-                  {ownedCount} de {TOTAL_STICKERS} — faltam {missing}
+                  {isMemberOnlyView
+                    ? `${groupOwned.size} de ${TOTAL_STICKERS} — faltam ${groupMissing}`
+                    : `${ownedCount} de ${TOTAL_STICKERS} — faltam ${missing}`}
                 </CardDescription>
               </div>
               <Badge variant="success" className="text-sm tabular-nums">
-                {percent}%
+                {isMemberOnlyView ? groupPercent : percent}%
               </Badge>
             </div>
-            <Progress value={percent} className="h-3" />
-            {isSharedAlbum && (
+            <Progress
+              value={isMemberOnlyView ? groupPercent : percent}
+              className="h-3"
+            />
+            {isSharedAlbum && !isMemberOnlyView && (
               <p className="text-sm text-muted">
                 Grupo: {groupOwned.size}/{TOTAL_STICKERS} ({groupPercent}%)
               </p>
@@ -254,22 +333,30 @@ export function AlbumClient() {
             <TabsList
               className={cn(
                 "grid h-auto min-h-12 w-full max-w-3xl gap-0.5 max-sm:mx-auto sm:gap-1",
-                isSharedAlbum ? "grid-cols-2 sm:grid-cols-5" : "grid-cols-4",
+                isMemberOnlyView
+                  ? "grid-cols-2"
+                  : isSharedAlbum
+                    ? "grid-cols-2 sm:grid-cols-5"
+                    : "grid-cols-4",
               )}
             >
               <TabsTrigger value="list" className="min-h-10 px-2 text-xs sm:px-4 sm:text-sm">
                 Listar
               </TabsTrigger>
-              <TabsTrigger value="mark" className="min-h-10 px-2 text-xs sm:px-4 sm:text-sm">
-                Marcar
-              </TabsTrigger>
-              <TabsTrigger value="teams" className="min-h-10 px-2 text-xs sm:px-4 sm:text-sm">
-                Seleções
-              </TabsTrigger>
+              {!isMemberOnlyView && (
+                <>
+                  <TabsTrigger value="mark" className="min-h-10 px-2 text-xs sm:px-4 sm:text-sm">
+                    Marcar
+                  </TabsTrigger>
+                  <TabsTrigger value="teams" className="min-h-10 px-2 text-xs sm:px-4 sm:text-sm">
+                    Seleções
+                  </TabsTrigger>
+                </>
+              )}
               <TabsTrigger value="duplicates" className="min-h-10 px-2 text-xs sm:px-4 sm:text-sm">
                 Repetidas
               </TabsTrigger>
-              {isSharedAlbum && (
+              {isSharedAlbum && !isMemberOnlyView && (
                 <TabsTrigger value="group" className="min-h-10 px-2 text-xs sm:col-span-2 sm:px-4 sm:text-sm">
                   Grupo
                 </TabsTrigger>
@@ -295,9 +382,9 @@ export function AlbumClient() {
               ) : (
                 <StickerListGrouped
                   numbers={visibleNumbers}
-                  owned={owned}
-                  getState={getState}
-                  onEditDuplicate={openDuplicateEditor}
+                  owned={listOwned}
+                  getState={listGetState}
+                  onEditDuplicate={isMemberOnlyView ? undefined : openDuplicateEditor}
                 />
               )}
             </TabsContent>
@@ -382,36 +469,55 @@ export function AlbumClient() {
             </TabsContent>
 
             <TabsContent value="duplicates" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Minhas repetidas publicadas</CardTitle>
-                  <CardDescription>
-                    Figurinhas extras visíveis aos membros do álbum compartilhado.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {publishedDuplicates.length === 0 ? (
-                    <p className="text-muted">
-                      Nenhuma repetida publicada. Segure uma figurinha na aba
-                      Marcar para definir quantidade.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {publishedDuplicates.map((num) => {
-                        const sel = selectionForNumber(num);
-                        const label = sel
-                          ? formatOfficialCode(sel, num)
-                          : `#${num}`;
-                        return (
-                          <Badge key={num} variant="secondary">
-                            {label} ×{getState(num).duplicateCount}
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {isMemberOnlyView ? (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Repetidas do álbum</CardTitle>
+                    <CardDescription>
+                      Repetidas publicadas por todos os membros — incluindo as que
+                      você ainda não tem.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <GroupDuplicatesFeed
+                      duplicates={memberDuplicates}
+                      filterNeededOnly={filterNeededOnly}
+                      onFilterChange={setFilterNeededOnly}
+                    />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Minhas repetidas publicadas</CardTitle>
+                    <CardDescription>
+                      Figurinhas extras visíveis aos membros do álbum compartilhado.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {publishedDuplicates.length === 0 ? (
+                      <p className="text-muted">
+                        Nenhuma repetida publicada. Segure uma figurinha na aba
+                        Marcar para definir quantidade.
+                      </p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {publishedDuplicates.map((num) => {
+                          const sel = selectionForNumber(num);
+                          const label = sel
+                            ? formatOfficialCode(sel, num)
+                            : `#${num}`;
+                          return (
+                            <Badge key={num} variant="secondary">
+                              {label} ×{getState(num).duplicateCount}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {isSharedAlbum && (
