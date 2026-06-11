@@ -1,10 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Search } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -19,7 +17,7 @@ import {
   TOTAL_STICKERS,
   formatOfficialCode,
   localNumberForGlobal,
-  parseStickerQuery,
+  resolveAlbumFilter,
   selectionForNumber,
   stickerCount,
   stickersForSelection,
@@ -30,38 +28,46 @@ import { cn } from "@/lib/utils";
 
 const ALL = "all";
 
+const inputClassName =
+  "min-h-12 w-full rounded-xl border-2 border-border bg-card-muted px-3 text-base text-foreground shadow-[var(--shadow-1)] outline-none transition-colors duration-[var(--motion-instant)] focus:border-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-copa-gold-bright";
+
 export function AlbumClient() {
   const { owned, toggle, ready, ownedCount, percent } = useOwnedStickers();
   const [selectionId, setSelectionId] = React.useState<string>(ALL);
   const [search, setSearch] = React.useState("");
   const [flash, setFlash] = React.useState<number | null>(null);
 
-  const selection = React.useMemo(
-    () => SELECTIONS.find((s) => s.id === selectionId),
-    [selectionId],
+  const filter = React.useMemo(
+    () => resolveAlbumFilter(search, selectionId),
+    [search, selectionId],
   );
 
-  const visibleNumbers = React.useMemo(() => {
-    if (selectionId === ALL) {
-      return Array.from({ length: TOTAL_STICKERS }, (_, i) => i + 1);
-    }
-    if (!selection) return [];
-    return stickersForSelection(selection);
-  }, [selectionId, selection]);
+  const visibleNumbers = filter.numbers;
 
-  const goToNumber = React.useCallback(() => {
-    const n = parseStickerQuery(search.trim());
-    if (n == null) return;
-    setFlash(n);
-    window.requestAnimationFrame(() => {
+  React.useEffect(() => {
+    if (!search.trim()) return;
+    if (filter.selectionId !== ALL && filter.selectionId !== selectionId) {
+      setSelectionId(filter.selectionId);
+    }
+  }, [filter.selectionId, search, selectionId]);
+
+  React.useEffect(() => {
+    const target = filter.exactSticker;
+    if (target == null) return;
+
+    const timer = window.setTimeout(() => {
+      setFlash(target);
       document
-        .getElementById(`sticker-${n}`)
+        .getElementById(`sticker-${target}`)
         ?.scrollIntoView({ behavior: "smooth", block: "center" });
-    });
-    window.setTimeout(() => setFlash(null), 1400);
-  }, [search]);
+      window.setTimeout(() => setFlash(null), 1400);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [filter.exactSticker]);
 
   const missing = TOTAL_STICKERS - ownedCount;
+  const hasActiveSearch = search.trim().length > 0;
 
   function selectionProgress(sel: Selection) {
     const nums = stickersForSelection(sel);
@@ -70,21 +76,26 @@ export function AlbumClient() {
     return { got, total: nums.length, pct };
   }
 
+  function handleSelectionChange(value: string) {
+    setSelectionId(value);
+    setSearch("");
+  }
+
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader />
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-4 py-6 sm:px-6">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 max-sm:hidden">
           <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
             Meu álbum
           </h1>
-          <p className="text-muted text-base">
+          <p className="text-base text-muted">
             Toque na figurinha para marcar se você já tem. Os códigos seguem o
             verso Panini (ex.: BRA 7 ou posição 1–980 no checklist).
           </p>
         </div>
 
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden max-sm:hidden">
           <CardHeader className="gap-4 pb-2">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -108,21 +119,27 @@ export function AlbumClient() {
           </div>
         ) : (
           <Tabs defaultValue="mark" className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsList className="grid w-full max-w-md grid-cols-2 max-sm:mx-auto">
               <TabsTrigger value="mark">Marcar</TabsTrigger>
               <TabsTrigger value="teams">Por seleção</TabsTrigger>
             </TabsList>
 
             <TabsContent value="mark" className="space-y-4">
-              <Card>
-                <CardContent className="flex flex-col gap-4 pt-6">
+              <Card
+                className={cn(
+                  "overflow-visible",
+                  "max-sm:sticky max-sm:top-14 max-sm:z-30 max-sm:-mx-4 max-sm:rounded-none max-sm:border-x-0 max-sm:border-t-0 max-sm:bg-background/95 max-sm:shadow-none max-sm:backdrop-blur-md",
+                )}
+              >
+                <CardContent className="flex flex-col gap-3 pt-4 sm:gap-4 sm:pt-6">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
                     <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium text-foreground">
-                      Seleção
+                      <span className="max-sm:sr-only">Seleção</span>
                       <select
                         value={selectionId}
-                        onChange={(e) => setSelectionId(e.target.value)}
-                        className="min-h-12 w-full rounded-xl border-2 border-border bg-white px-3 text-base font-medium text-foreground shadow-sm outline-none focus:border-primary"
+                        onChange={(e) => handleSelectionChange(e.target.value)}
+                        className={cn(inputClassName, "max-sm:order-2")}
+                        aria-label="Filtrar por seleção"
                       >
                         <option value={ALL}>Todas ({TOTAL_STICKERS})</option>
                         {SELECTIONS.map((s) => (
@@ -132,83 +149,109 @@ export function AlbumClient() {
                         ))}
                       </select>
                     </label>
-                    <div className="flex flex-1 flex-col gap-2 sm:max-w-xs">
-                      <span className="text-sm font-medium text-foreground">
+                    <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium text-foreground sm:max-w-md">
+                      <span className="max-sm:sr-only">
                         Buscar (checklist ou verso)
                       </span>
-                      <div className="flex gap-2">
-                        <input
-                          inputMode="text"
-                          autoCapitalize="characters"
-                          placeholder="Ex: 42 ou BRA 7"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") goToNumber();
-                          }}
-                          className="min-h-12 w-full min-w-0 flex-1 rounded-xl border-2 border-border px-3 text-base outline-none focus:border-primary"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="min-h-12 shrink-0 px-4"
-                          onClick={goToNumber}
-                          aria-label="Buscar figurinha"
-                        >
-                          <Search className="size-5" />
-                        </Button>
-                      </div>
-                    </div>
+                      <input
+                        type="search"
+                        inputMode="search"
+                        autoCapitalize="characters"
+                        autoComplete="off"
+                        enterKeyHint="search"
+                        placeholder="Ex: 42, BRA ou BRA 7"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        className={cn(inputClassName, "max-sm:order-1")}
+                        aria-label="Buscar figurinha por número ou país"
+                      />
+                    </label>
                   </div>
+                  {hasActiveSearch && (
+                    <p className="text-sm text-muted" aria-live="polite">
+                      {visibleNumbers.length === 0
+                        ? "Nenhuma figurinha encontrada."
+                        : visibleNumbers.length === 1
+                          ? `1 figurinha — ${formatOfficialCode(selectionForNumber(visibleNumbers[0])!, visibleNumbers[0])} (#${visibleNumbers[0]})`
+                          : `${visibleNumbers.length} figurinhas`}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
-                {visibleNumbers.map((num) => {
-                  const sel = selectionForNumber(num);
-                  if (!sel) return null;
-                  const isLogo = sel.versoPrefix === "00";
-                  const local = localNumberForGlobal(sel, num);
-                  const label = formatOfficialCode(sel, num);
-                  return (
-                    <button
-                      key={num}
-                      id={`sticker-${num}`}
-                      type="button"
-                      title={`Checklist #${num} · ${label}`}
-                      onClick={() => toggle(num)}
-                      className={cn(
-                        "flex min-h-16 select-none flex-col items-center justify-center gap-0.5 rounded-2xl border-2 px-1 py-1.5 text-center transition-all duration-150 active:scale-95 touch-manipulation",
-                        owned.has(num)
-                          ? "border-success bg-success text-white shadow-sm"
-                          : "border-border bg-white text-foreground hover:border-primary/50",
-                        flash === num && "ring-4 ring-primary ring-offset-2",
-                      )}
-                    >
-                      {isLogo ? (
-                        <span className="text-sm font-bold leading-none">00</span>
-                      ) : (
-                        <>
-                          <span className="text-[10px] font-semibold leading-none opacity-80 sm:text-[11px]">
-                            {sel.versoPrefix}
-                          </span>
-                          <span className="text-base font-bold leading-none sm:text-lg">
-                            {local}
-                          </span>
-                        </>
-                      )}
-                      <span
+              <Card className="overflow-hidden sm:hidden">
+                <CardHeader className="gap-3 pb-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-base">Progresso</CardTitle>
+                    <Badge variant="success" className="text-sm tabular-nums">
+                      {percent}%
+                    </Badge>
+                  </div>
+                  <CardDescription className="tabular-nums">
+                    {ownedCount} de {TOTAL_STICKERS} — faltam {missing}
+                  </CardDescription>
+                  <Progress value={percent} className="h-2.5" />
+                </CardHeader>
+              </Card>
+
+              {visibleNumbers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted">
+                  <p className="text-base font-medium text-foreground">
+                    Nenhum resultado
+                  </p>
+                  <p className="text-sm">
+                    Tente outro número (1–980), código do verso ou nome do país.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
+                  {visibleNumbers.map((num) => {
+                    const sel = selectionForNumber(num);
+                    if (!sel) return null;
+                    const isLogo = sel.versoPrefix === "00";
+                    const local = localNumberForGlobal(sel, num);
+                    const label = formatOfficialCode(sel, num);
+                    return (
+                      <button
+                        key={num}
+                        id={`sticker-${num}`}
+                        type="button"
+                        title={`Checklist #${num} · ${label}`}
+                        onClick={() => toggle(num)}
                         className={cn(
-                          "text-[9px] font-medium tabular-nums leading-none opacity-60",
-                          owned.has(num) && "text-white/80",
+                          "flex min-h-16 select-none flex-col items-center justify-center gap-0.5 rounded-2xl border-2 px-1 py-1.5 text-center transition-all duration-150 active:scale-95 touch-manipulation",
+                          owned.has(num)
+                            ? "border-success bg-success text-white shadow-[var(--shadow-1)]"
+                            : "border-border bg-card-muted text-foreground hover:border-primary/50",
+                          flash === num &&
+                            "ring-4 ring-primary ring-offset-2 ring-offset-background",
                         )}
                       >
-                        #{num}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+                        {isLogo ? (
+                          <span className="text-sm font-bold leading-none">00</span>
+                        ) : (
+                          <>
+                            <span className="text-[10px] font-semibold leading-none opacity-80 sm:text-[11px]">
+                              {sel.versoPrefix}
+                            </span>
+                            <span className="text-base font-bold leading-none sm:text-lg">
+                              {local}
+                            </span>
+                          </>
+                        )}
+                        <span
+                          className={cn(
+                            "text-[9px] font-medium tabular-nums leading-none opacity-60",
+                            owned.has(num) && "text-white/80",
+                          )}
+                        >
+                          #{num}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </TabsContent>
 
             <TabsContent value="teams">

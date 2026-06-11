@@ -180,3 +180,99 @@ export function parseStickerQuery(raw: string): number | null {
 
   return sel.startNumber + local - 1;
 }
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "");
+}
+
+export type AlbumFilterResult = {
+  selectionId: string;
+  numbers: number[];
+  exactSticker: number | null;
+};
+
+const ALL_NUMBERS = Array.from({ length: TOTAL_STICKERS }, (_, i) => i + 1);
+
+/**
+ * Filtra a listagem por busca parcial: checklist (#42, #4…), código verso (BRA 7) ou país/seleção (BRA, Brasil).
+ * Com busca vazia, usa apenas o filtro de seleção do dropdown.
+ */
+export function resolveAlbumFilter(
+  raw: string,
+  fallbackSelectionId: string,
+): AlbumFilterResult {
+  const q = raw.trim();
+
+  if (!q) {
+    if (fallbackSelectionId === "all") {
+      return { selectionId: "all", numbers: ALL_NUMBERS, exactSticker: null };
+    }
+    const sel = SELECTIONS.find((s) => s.id === fallbackSelectionId);
+    if (!sel) {
+      return { selectionId: "all", numbers: ALL_NUMBERS, exactSticker: null };
+    }
+    return {
+      selectionId: sel.id,
+      numbers: stickersForSelection(sel),
+      exactSticker: null,
+    };
+  }
+
+  const exact = parseStickerQuery(q);
+  if (exact != null) {
+    const sel = selectionForNumber(exact)!;
+    return {
+      selectionId: sel.id,
+      numbers: [exact],
+      exactSticker: exact,
+    };
+  }
+
+  if (/^\d+$/.test(q)) {
+    const numbers = ALL_NUMBERS.filter((n) => String(n).startsWith(q));
+    return { selectionId: "all", numbers, exactSticker: null };
+  }
+
+  const up = q.toUpperCase().replace(/\s+/g, " ");
+  const normalizedQuery = normalizeText(q);
+
+  const partialCode = up.match(/^([A-Z]{1,3})(?:\s*(\d*))?$/);
+  if (partialCode) {
+    const [, prefix, numPart] = partialCode;
+    const selections = SELECTIONS.filter((s) =>
+      s.versoPrefix.startsWith(prefix),
+    );
+    if (selections.length > 0) {
+      let numbers = selections.flatMap((s) => stickersForSelection(s));
+      if (numPart) {
+        numbers = numbers.filter((n) => {
+          const sel = selectionForNumber(n)!;
+          return String(localNumberForGlobal(sel, n)).startsWith(numPart);
+        });
+      }
+      return {
+        selectionId: selections.length === 1 ? selections[0].id : "all",
+        numbers,
+        exactSticker: null,
+      };
+    }
+  }
+
+  const matched = SELECTIONS.filter((s) => {
+    if (s.versoPrefix.toUpperCase().startsWith(up)) return true;
+    return normalizeText(s.name).includes(normalizedQuery);
+  });
+
+  if (matched.length > 0) {
+    return {
+      selectionId: matched.length === 1 ? matched[0].id : "all",
+      numbers: matched.flatMap((s) => stickersForSelection(s)),
+      exactSticker: null,
+    };
+  }
+
+  return { selectionId: "all", numbers: [], exactSticker: null };
+}

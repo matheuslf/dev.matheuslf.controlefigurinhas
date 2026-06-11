@@ -24,8 +24,8 @@ function MockSticker({
     <div
       className={
         owned
-          ? "flex h-12 items-center justify-center rounded-2xl border-2 border-success bg-success text-sm font-bold text-white shadow-sm"
-          : "flex h-12 items-center justify-center rounded-2xl border-2 border-border bg-white text-sm font-semibold text-foreground"
+          ? "flex h-12 items-center justify-center rounded-2xl border-2 border-success bg-success text-sm font-bold text-white shadow-[var(--shadow-1)]"
+          : "flex h-12 items-center justify-center rounded-2xl border-2 border-border bg-card-muted text-sm font-semibold text-foreground"
       }
     >
       {n}
@@ -37,16 +37,19 @@ export default function HomePage() {
   const previewOwned = new Set([1, 2, 5, 8, 13, 21, 34]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader />
 
       <main className="flex-1">
-        <section className="border-b border-border bg-gradient-to-b from-card to-white px-4 py-16 sm:px-6 sm:py-24">
+        <section className="copa-hero-gradient border-b border-border px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:items-center">
             <div className="flex flex-col gap-6">
-              <Badge className="w-fit">Copa do Mundo 2026</Badge>
+              <Badge variant="copa" className="w-fit">
+                Copa do Mundo 2026
+              </Badge>
               <h1 className="text-4xl font-bold leading-tight tracking-tight text-foreground sm:text-5xl">
-                Seu álbum, sem papel.
+                Seu álbum,{" "}
+                <span className="text-primary">sem papel</span>.
               </h1>
               <p className="max-w-lg text-lg text-muted">
                 Marque figurinhas em segundos. Feito para celular — e fácil para
@@ -68,12 +71,12 @@ export default function HomePage() {
 
             <Card
               id="preview"
-              className="scroll-mt-24 overflow-hidden shadow-md lg:max-w-lg lg:justify-self-end"
+              className="scroll-mt-24 overflow-hidden shadow-[var(--shadow-3)] lg:max-w-lg lg:justify-self-end"
             >
-              <CardHeader className="border-b border-border bg-card pb-4">
+              <CardHeader className="border-b border-border bg-card-muted pb-4">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-lg">Prévia do álbum</CardTitle>
-                  <Badge variant="secondary">Ao vivo</Badge>
+                  <Badge variant="success">Ao vivo</Badge>
                 </div>
                 <CardDescription>Toque para marcar — assim no app</CardDescription>
                 <div className="pt-2">
@@ -106,21 +109,29 @@ export default function HomePage() {
                   icon: LayoutGrid,
                   title: "1. Escolha a seleção",
                   text: "Filtre por time ou veja o álbum inteiro.",
+                  accent: "text-copa-blue",
+                  bg: "bg-copa-blue/10",
                 },
                 {
                   icon: BookOpenCheck,
                   title: "2. Marque figurinhas",
                   text: "Um toque: tenho ou ainda não tenho.",
+                  accent: "text-copa-red",
+                  bg: "bg-copa-red/10",
                 },
                 {
                   icon: Sparkles,
                   title: "3. Veja o progresso",
                   text: "Barra geral e por seleção, sempre atualizada.",
+                  accent: "text-primary",
+                  bg: "bg-primary/10",
                 },
               ].map((step) => (
-                <Card key={step.title} className="text-center shadow-sm">
+                <Card key={step.title} className="text-center shadow-[var(--shadow-2)]">
                   <CardHeader className="items-center pb-2">
-                    <div className="mb-2 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <div
+                      className={`mb-2 flex h-14 w-14 items-center justify-center rounded-2xl ${step.bg} ${step.accent}`}
+                    >
                       <step.icon className="h-7 w-7" strokeWidth={2} />
                     </div>
                     <CardTitle className="text-xl">{step.title}</CardTitle>
@@ -134,7 +145,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="border-y border-border bg-card px-4 py-16 sm:px-6 sm:py-20">
+        <section className="border-y border-border bg-card-muted px-4 py-16 sm:px-6 sm:py-20">
           <div className="mx-auto max-w-6xl">
             <h2 className="mb-10 text-center text-3xl font-bold text-foreground">
               Benefícios
@@ -146,7 +157,7 @@ export default function HomePage() {
                 { t: "Feito pro celular", d: "Botões grandes e toque na figurinha." },
                 { t: "Fácil pra crianças", d: "Pouco texto, fluxo direto ao ponto." },
               ].map((b) => (
-                <Card key={b.t}>
+                <Card key={b.t} className="border-border-strong">
                   <CardHeader>
                     <CardTitle className="text-lg">{b.t}</CardTitle>
                     <CardDescription className="text-base">{b.d}</CardDescription>
@@ -158,22 +169,25 @@ export default function HomePage() {
         </section>
 
         <section className="relative overflow-hidden px-4 py-20 sm:px-6 sm:py-28">
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-card-muted/80 to-transparent" />
           <div className="relative mx-auto flex max-w-2xl flex-col items-center gap-6 text-center">
+            <Badge variant="default" className="text-sm">
+              #WeAre26
+            </Badge>
             <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
               Pronto para trocar o caderno pelo app?
             </h2>
             <p className="text-lg text-muted">
               Comece agora — sem cadastro para o MVP.
             </p>
-            <Button asChild className="min-h-14 rounded-2xl px-10 text-lg">
+            <Button asChild className="min-h-14 rounded-2xl px-10 text-lg shadow-[var(--shadow-glow-gold)]">
               <Link href="/album">Começar meu álbum</Link>
             </Button>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-border py-8 text-center text-sm text-muted">
+      <footer className="border-t border-border bg-card-muted py-8 text-center text-sm text-muted">
         Figurinhas Copa 2026 — uso familiar. Dados salvos localmente neste
         dispositivo.
       </footer>
