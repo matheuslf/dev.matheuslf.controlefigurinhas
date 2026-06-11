@@ -22,6 +22,7 @@ import { GroupDuplicatesFeed } from "@/components/albums/group-duplicates-feed";
 import { AlbumFilterBar } from "@/components/album-filter-bar";
 import { StickerGridGrouped } from "@/components/sticker-grid-grouped";
 import { StickerListGrouped } from "@/components/sticker-list-grouped";
+import { PublishedDuplicatesGrouped } from "@/components/published-duplicates-grouped";
 import { SelectionFlag } from "@/components/selection-flag";
 import { DuplicateEditor } from "@/components/duplicate-editor";
 import {
@@ -499,19 +500,10 @@ export function AlbumClient() {
                         Marcar para definir quantidade.
                       </p>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {publishedDuplicates.map((num) => {
-                          const sel = selectionForNumber(num);
-                          const label = sel
-                            ? formatOfficialCode(sel, num)
-                            : `#${num}`;
-                          return (
-                            <Badge key={num} variant="secondary">
-                              {label} ×{getState(num).duplicateCount}
-                            </Badge>
-                          );
-                        })}
-                      </div>
+                      <PublishedDuplicatesGrouped
+                        numbers={publishedDuplicates}
+                        getDuplicateCount={(num) => getState(num).duplicateCount}
+                      />
                     )}
                   </CardContent>
                 </Card>
