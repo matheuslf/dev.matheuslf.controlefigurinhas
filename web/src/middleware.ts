@@ -15,5 +15,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/albums/:path*", "/profile"],
+  matcher: ["/albums/:path*", "/profile", "/trades"],
 };

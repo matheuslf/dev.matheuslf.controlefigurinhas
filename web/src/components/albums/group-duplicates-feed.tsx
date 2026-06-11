@@ -43,7 +43,7 @@ export function GroupDuplicatesFeed({
 
       {duplicates.length === 0 ? (
         <p className="py-8 text-center text-muted">
-          Nenhuma repetida publicada pelos membros
+          Nenhuma repetida de outros membros disponível para troca
           {filterNeededOnly ? " que você ainda não tem" : ""}.
         </p>
       ) : (

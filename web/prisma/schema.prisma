@@ -12,6 +12,13 @@ enum AlbumMemberRole {
   MEMBER
 }
 
+enum TradeStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -27,6 +34,9 @@ model User {
 
   albumMembers AlbumMember[]
   stickers     UserSticker[]
+  albumVisits  AlbumVisitor[]
+  tradeRequestsSent     TradeRequest[] @relation("TradeRequester")
+  tradeRequestsReceived TradeRequest[] @relation("TradeTarget")
 }
 
 model Account {
@@ -76,10 +86,14 @@ model Album {
   inviteRevoked        Boolean  @default(false)
   ownerInviteCode      String?  @unique
   ownerInviteRevoked   Boolean  @default(false)
+  isPublic             Boolean  @default(true)
+  viewCount            Int      @default(0)
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  members AlbumMember[]
+  members       AlbumMember[]
+  visitors      AlbumVisitor[]
+  tradeRequests TradeRequest[]
 }
 
 model AlbumMember {
@@ -96,6 +110,22 @@ model AlbumMember {
   @@index([userId])
 }
 
+model AlbumVisitor {
+  id             String   @id @default(cuid())
+  albumId        String
+  userId         String
+  visitCount     Int      @default(1)
+  firstVisitedAt DateTime @default(now())
+  lastVisitedAt  DateTime @updatedAt
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, userId])
+  @@index([userId, lastVisitedAt])
+  @@index([albumId, lastVisitedAt])
+}
+
 model UserSticker {
   id             String  @id @default(cuid())
   userId         String
@@ -107,4 +137,26 @@ model UserSticker {
 
   @@unique([userId, stickerNumber])
   @@index([userId, duplicateCount])
+}
+
+model TradeRequest {
+  id            String      @id @default(cuid())
+  albumId       String
+  requesterId   String
+  targetUserId  String
+  stickerNumber Int
+  quantity      Int         @default(1)
+  message       String?
+  status        TradeStatus @default(PENDING)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  album     Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  requester User  @relation("TradeRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  target    User  @relation("TradeTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([albumId])
+  @@index([requesterId])
+  @@index([targetUserId])
+  @@index([status])
 }

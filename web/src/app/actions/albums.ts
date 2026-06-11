@@ -304,6 +304,20 @@ export async function renameAlbum(albumId: string, name: string) {
     data: { name: name.trim() || "Álbum compartilhado" },
   });
   revalidatePath("/albums");
+  revalidatePath("/gallery");
+}
+
+export async function setAlbumPublic(albumId: string, isPublic: boolean) {
+  const userId = await requireUserId();
+  await requireAlbumOwner(albumId, userId);
+  await prisma.album.update({
+    where: { id: albumId },
+    data: { isPublic },
+  });
+  revalidatePath("/albums");
+  revalidatePath("/gallery");
+  revalidatePath(`/gallery/${albumId}`);
+  revalidatePath(`/albums/${albumId}/settings`);
 }
 
 export async function getAlbumPreview(token: string) {
@@ -501,5 +515,6 @@ export async function getAlbumById(albumId: string) {
     memberCount: album._count.members,
     inviteToken: album.inviteToken,
     inviteRevoked: album.inviteRevoked,
+    isPublic: album.isPublic,
   };
 }
