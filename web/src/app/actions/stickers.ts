@@ -49,7 +49,7 @@ export async function upsertStickers(
       s.duplicateCount === 0,
   );
 
-  await prisma.$transaction([
+  const ops = [
     ...valid.map((s) =>
       prisma.userSticker.upsert({
         where: {
@@ -72,7 +72,11 @@ export async function upsertStickers(
         where: { userId, stickerNumber: s.stickerNumber },
       }),
     ),
-  ]);
+  ];
+
+  if (ops.length > 0) {
+    await prisma.$transaction(ops);
+  }
 }
 
 export async function mergeLocalStickers(

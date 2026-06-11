@@ -37,6 +37,21 @@ type StickerCollectionContextValue = {
 const StickerCollectionContext =
   React.createContext<StickerCollectionContextValue | null>(null);
 
+async function fetchCloudStickers(retries = 3) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await getMyStickers();
+    } catch (error) {
+      lastError = error;
+      if (attempt < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * (attempt + 1)));
+      }
+    }
+  }
+  throw lastError;
+}
+
 export function StickerCollectionProvider({
   children,
 }: {
@@ -53,7 +68,8 @@ export function StickerCollectionProvider({
   >("idle");
 
   const syncTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cloudUserId = React.useRef<string | null>(null);
+  const cloudSyncedUserId = React.useRef<string | null>(null);
+  const cloudLoadInFlight = React.useRef<string | null>(null);
   const isSaving = React.useRef(false);
 
   const scheduleSync = React.useCallback(
@@ -104,39 +120,65 @@ export function StickerCollectionProvider({
     [scheduleSync],
   );
 
-  const loadFromCloud = React.useCallback(async () => {
-    setSyncStatus("loading");
-    try {
-      let remote = await getMyStickers();
-
-      const localLegacy = collectionToPlain(loadFromStorage());
-      if (!hasStickerData(remote) && hasStickerData(localLegacy)) {
-        await mergeLocalStickers(localLegacy, "local");
-        remote = await getMyStickers();
-      }
-
-      applyCollection(plainToCollection(remote), { syncStatus: "synced" });
-    } catch {
-      applyCollection(loadFromStorage(), { syncStatus: "offline" });
-    }
-  }, [applyCollection]);
-
   React.useEffect(() => {
-    if (status === "loading") return;
+    if (status === "loading") {
+      setCollection((prev) => prev ?? loadFromStorage());
+      return;
+    }
 
     if (status === "unauthenticated") {
-      cloudUserId.current = null;
+      cloudSyncedUserId.current = null;
+      cloudLoadInFlight.current = null;
       setCollection(loadFromStorage());
       setSyncStatus("offline");
       return;
     }
 
-    if (status === "authenticated" && userId && cloudUserId.current !== userId) {
-      cloudUserId.current = userId;
-      setCollection(null);
-      void loadFromCloud();
+    if (!userId) {
+      setCollection((prev) => prev ?? loadFromStorage());
+      return;
     }
-  }, [status, userId, loadFromCloud]);
+
+    if (
+      cloudSyncedUserId.current === userId ||
+      cloudLoadInFlight.current === userId
+    ) {
+      return;
+    }
+
+    cloudLoadInFlight.current = userId;
+    setSyncStatus("loading");
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        let remote = await fetchCloudStickers();
+        const localLegacy = collectionToPlain(loadFromStorage());
+
+        if (!hasStickerData(remote) && hasStickerData(localLegacy)) {
+          await mergeLocalStickers(localLegacy, "local");
+          remote = await fetchCloudStickers();
+        }
+
+        if (cancelled) return;
+
+        applyCollection(plainToCollection(remote), { syncStatus: "synced" });
+        cloudSyncedUserId.current = userId;
+      } catch {
+        if (cancelled) return;
+        applyCollection(loadFromStorage(), { syncStatus: "offline" });
+        cloudSyncedUserId.current = userId;
+      } finally {
+        if (cloudLoadInFlight.current === userId) {
+          cloudLoadInFlight.current = null;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [status, userId, applyCollection]);
 
   React.useEffect(() => {
     if (status !== "authenticated" || !userId) return;

@@ -38,6 +38,8 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
   const [name, setName] = React.useState("");
   const [inviteUrl, setInviteUrl] = React.useState("");
   const [loading, setLoading] = React.useState(true);
+  const [leaveError, setLeaveError] = React.useState<string | null>(null);
+  const [leaving, setLeaving] = React.useState(false);
 
   React.useEffect(() => {
     Promise.all([getAlbumById(albumId), getAlbumMembers(albumId)])
@@ -80,6 +82,10 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
   }
 
   const isOwner = album.role === "OWNER";
+  const ownerCount = members.filter((m) => m.role === "OWNER").length;
+  const isSoleOwner = isOwner && ownerCount === 1;
+  const isOnlyMember = members.length === 1;
+  const mustPromoteFirst = isSoleOwner && !isOnlyMember;
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -169,17 +175,52 @@ export function AlbumSettingsClient({ albumId }: AlbumSettingsClientProps) {
           </CardContent>
         </Card>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="border-destructive text-destructive hover:bg-destructive/10"
-          onClick={async () => {
-            await leaveAlbum(albumId);
-            router.push("/albums");
-          }}
-        >
-          Sair deste álbum
-        </Button>
+        <div className="flex flex-col gap-2">
+          {mustPromoteFirst && (
+            <p className="text-sm text-muted">
+              Você é o único dono deste álbum. Promova outro membro a dono antes
+              de sair.
+            </p>
+          )}
+          {leaveError && (
+            <p className="text-sm text-destructive" role="alert">
+              {leaveError}
+            </p>
+          )}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={mustPromoteFirst || leaving}
+            className="border-destructive text-destructive hover:bg-destructive/10 disabled:opacity-50"
+            onClick={async () => {
+              const confirmMessage = isSoleOwner && isOnlyMember
+                ? "Excluir este álbum? Essa ação não pode ser desfeita."
+                : "Sair deste álbum?";
+              if (!window.confirm(confirmMessage)) return;
+
+              setLeaveError(null);
+              setLeaving(true);
+              try {
+                await leaveAlbum(albumId);
+                router.push("/albums");
+              } catch (error) {
+                setLeaveError(
+                  error instanceof Error
+                    ? error.message
+                    : "Não foi possível sair do álbum.",
+                );
+              } finally {
+                setLeaving(false);
+              }
+            }}
+          >
+            {leaving
+              ? "Saindo…"
+              : isSoleOwner && isOnlyMember
+                ? "Excluir álbum"
+                : "Sair deste álbum"}
+          </Button>
+        </div>
       </main>
     </div>
   );
