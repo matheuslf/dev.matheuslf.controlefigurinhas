@@ -105,8 +105,7 @@ export function GalleryDuplicatesFeed({
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
-                        className="shrink-0 rounded-lg"
+                        className="h-9 min-h-0 shrink-0 rounded-lg px-3 text-xs"
                         onClick={() =>
                           setTradeTarget({
                             targetUserId: item.userId,
