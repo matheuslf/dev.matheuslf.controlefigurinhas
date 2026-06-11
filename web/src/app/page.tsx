@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BookOpenCheck, LayoutGrid, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
+import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -64,8 +65,8 @@ export default function HomePage() {
                 </Button>
               </div>
               <p className="text-sm text-muted">
-                {TOTAL_STICKERS} figurinhas no álbum Panini — controle completo no
-                app.
+                {TOTAL_STICKERS} figurinhas no álbum Panini — use sem conta ou entre
+                com Google para sincronizar e trocar repetidas.
               </p>
             </div>
 
@@ -178,7 +179,8 @@ export default function HomePage() {
               Pronto para trocar o caderno pelo app?
             </h2>
             <p className="text-lg text-muted">
-              Comece agora — sem cadastro para o MVP.
+              Use sem conta ou entre com Google para sincronizar na nuvem e
+              compartilhar repetidas com amigos.
             </p>
             <Button asChild className="min-h-14 rounded-2xl px-10 text-lg shadow-[var(--shadow-glow-gold)]">
               <Link href="/album">Começar meu álbum</Link>
@@ -188,9 +190,10 @@ export default function HomePage() {
       </main>
 
       <footer className="border-t border-border bg-card-muted py-8 text-center text-sm text-muted">
-        Figurinhas Copa 2026 — uso familiar. Dados salvos localmente neste
-        dispositivo.
+        Figurinhas Copa 2026 — uso familiar. Dados salvos localmente; com login,
+        sincronizados na sua conta.
       </footer>
+      <GoogleOneTap />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { AlbumClient } from "./album-client";
 
 export const metadata: Metadata = {
@@ -7,5 +8,15 @@ export const metadata: Metadata = {
 };
 
 export default function AlbumPage() {
-  return <AlbumClient />;
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-muted">
+          Carregando álbum…
+        </div>
+      }
+    >
+      <AlbumClient />
+    </Suspense>
+  );
 }

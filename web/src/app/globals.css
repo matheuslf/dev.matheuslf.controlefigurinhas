@@ -1,8 +1,10 @@
 @import "tailwindcss";
+@import "flag-icons/css/flag-icons.min.css";
 
-/* Design tokens — foundations (DESIGN.MD / SKILL.MD) + Copa 2026 accents */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Tokens compartilhados (não mudam com o tema) */
 :root {
-  /* Typography */
   --font-size-xs: 12px;
   --font-size-sm: 13px;
   --font-size-md: 13.33px;
@@ -12,7 +14,6 @@
   --font-size-3xl: 28px;
   --font-size-4xl: 32px;
 
-  /* Spacing */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -22,31 +23,18 @@
   --space-7: 112px;
   --space-8: 128px;
 
-  /* Radius */
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
-  --radius-xl: 9999px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 9999px;
 
-  /* Motion */
   --motion-instant: 200ms;
   --motion-fast: 250ms;
   --motion-normal: 300ms;
 
-  /* Surfaces — dark base from design system */
-  --surface-base: #000000;
-  --surface-muted: #111111;
-  --surface-raised: #1e1e1e;
-  --surface-strong: #f2f2f2;
-
-  /* Text */
-  --text-primary: #e5e5e5;
-  --text-tertiary: #fbfbfb;
-  --text-inverse: #c5c5c5;
-  --text-muted: #a3a3a3;
-
-  /* Copa 2026 — troféu dourado + países-sede (EUA, Canadá, México) */
   --copa-gold: #d4af37;
   --copa-gold-bright: #f0c75e;
   --copa-red: #ce1126;
@@ -54,7 +42,51 @@
   --copa-green: #16a34a;
   --copa-white: #ffffff;
 
-  /* Semantic aliases */
+  --primary: var(--copa-gold);
+  --primary-foreground: #0a0a0a;
+  --success: var(--copa-green);
+  --accent: var(--copa-red);
+  --accent-secondary: var(--copa-blue);
+
+  /* Tema claro (padrão) */
+  --surface-base: #ffffff;
+  --surface-muted: #f5f5f5;
+  --surface-raised: #ffffff;
+  --surface-strong: #e5e5e5;
+  --text-primary: #171717;
+  --text-tertiary: #404040;
+  --text-inverse: #fafafa;
+  --text-muted: #737373;
+  --background: var(--surface-base);
+  --foreground: var(--text-primary);
+  --card: var(--surface-raised);
+  --card-muted: var(--surface-muted);
+  --border: #e5e5e5;
+  --border-strong: #d4d4d4;
+  --muted: var(--text-muted);
+  --header-bg: rgb(255 255 255 / 0.9);
+  --backdrop: rgb(0 0 0 / 0.45);
+
+  --shadow-1: rgba(0, 0, 0, 0.06) 0px 2px 4px 0px;
+  --shadow-2:
+    rgba(0, 0, 0, 0.08) 0px 0px 0px 0.5px,
+    rgba(0, 0, 0, 0.04) 0px 2px 2px -1px,
+    rgba(0, 0, 0, 0.04) 0px 4px 4px -2px;
+  --shadow-3:
+    rgba(0, 0, 0, 0.06) 0px 4px 12px -2px,
+    rgba(0, 0, 0, 0.04) 0px 12px 24px -8px;
+  --shadow-glow-gold: 0 0 24px rgba(212, 175, 55, 0.2);
+}
+
+.dark {
+  --surface-base: #000000;
+  --surface-muted: #111111;
+  --surface-raised: #1e1e1e;
+  --surface-strong: #f2f2f2;
+  --text-primary: #e5e5e5;
+  --text-tertiary: #fbfbfb;
+  --text-inverse: #c5c5c5;
+  --text-muted: #a3a3a3;
   --background: var(--surface-base);
   --foreground: var(--text-primary);
   --card: var(--surface-raised);
@@ -62,13 +94,9 @@
   --border: #2e2e2e;
   --border-strong: #404040;
   --muted: var(--text-muted);
-  --primary: var(--copa-gold);
-  --primary-foreground: #0a0a0a;
-  --success: var(--copa-green);
-  --accent: var(--copa-red);
-  --accent-secondary: var(--copa-blue);
+  --header-bg: rgb(0 0 0 / 0.85);
+  --backdrop: rgb(0 0 0 / 0.6);
 
-  /* Shadows */
   --shadow-1: rgba(0, 0, 0, 0.1) 0px 2px 4px 0px;
   --shadow-2:
     rgba(0, 0, 0, 0.12) 0px 0px 0px 0.5px,
@@ -110,6 +138,8 @@
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
+  --radius-full: var(--radius-pill);
 }
 
 body {
@@ -119,8 +149,15 @@ body {
   line-height: normal;
 }
 
-/* Copa 2026 decorative gradients */
 .copa-hero-gradient {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 0% 50%, rgba(206, 17, 38, 0.06), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 50%, rgba(30, 58, 138, 0.08), transparent),
+    linear-gradient(180deg, var(--surface-muted) 0%, var(--surface-base) 100%);
+}
+
+.dark .copa-hero-gradient {
   background:
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(212, 175, 55, 0.15), transparent),
     radial-gradient(ellipse 60% 40% at 0% 50%, rgba(206, 17, 38, 0.08), transparent),
@@ -141,7 +178,6 @@ body {
   );
 }
 
-/* Accessibility — focus-visible (WCAG 2.2 AA) */
 :focus-visible {
   outline: 2px solid var(--copa-gold-bright);
   outline-offset: 2px;
@@ -149,4 +185,26 @@ body {
 
 :focus:not(:focus-visible) {
   outline: none;
+}
+
+dialog.auth-modal {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  max-width: none;
+  max-height: none;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+dialog.auth-modal::backdrop {
+  background: var(--backdrop);
+}
+
+dialog.auth-modal[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

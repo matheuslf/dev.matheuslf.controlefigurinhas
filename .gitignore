@@ -9,6 +9,8 @@
 .env
 .env*.local
 !.env.example
+**/client_secret*.json
+documentos/client_secret*.json
 
 # Vercel
 .vercel
