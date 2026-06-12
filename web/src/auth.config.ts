@@ -1,12 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
-import {
-  authSecret,
-  googleClientId,
-  googleClientSecret,
-  publicGoogleClientId,
-  resendApiKey,
-  emailFrom,
-} from "@/lib/env";
+import { authSecret, emailFrom, resendApiKey } from "@/lib/env";
 
 /** Config compartilhada — compatível com Edge (middleware). Sem Prisma. */
 export const authConfig = {
@@ -48,6 +41,4 @@ export const authConfig = {
   },
 } satisfies NextAuthConfig;
 
-export const hasGoogleProvider = Boolean(googleClientId && googleClientSecret);
-export const hasEmailProvider = Boolean(resendApiKey && emailFrom);
-export const hasOneTapProvider = Boolean(publicGoogleClientId);
+export const hasEmailVerification = Boolean(resendApiKey && emailFrom);

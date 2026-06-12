@@ -77,7 +77,7 @@ export function AuthModal({ open, callbackUrl, authError, onClose }: AuthModalPr
                 Entrar
               </CardTitle>
               <CardDescription className="mx-auto max-w-[280px] text-center text-base leading-relaxed">
-                Entre com Google ou crie sua conta com e-mail e senha.
+                Entre com e-mail e senha ou crie sua conta.
               </CardDescription>
             </CardHeader>
 

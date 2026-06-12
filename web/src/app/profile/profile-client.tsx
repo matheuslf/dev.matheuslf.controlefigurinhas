@@ -174,12 +174,7 @@ export function ProfileClient() {
         <Card>
           <CardHeader>
             <CardTitle>Dados pessoais</CardTitle>
-            <div className="flex flex-wrap gap-2">
-              {profile.hasGoogle && <Badge variant="secondary">Google</Badge>}
-              {profile.hasPassword && (
-                <Badge variant="secondary">E-mail e senha</Badge>
-              )}
-            </div>
+            <Badge variant="secondary">E-mail e senha</Badge>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleProfileSubmit} className="flex flex-col gap-3">
@@ -205,7 +200,7 @@ export function ProfileClient() {
               </label>
               {!profile.hasPassword && (
                 <p className="text-xs text-muted">
-                  E-mail vinculado à conta Google e não pode ser alterado aqui.
+                  Defina uma senha abaixo para poder alterar o e-mail.
                 </p>
               )}
               {profile.hasPassword && email !== profile.email && (

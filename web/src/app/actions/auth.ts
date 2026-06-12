@@ -24,7 +24,6 @@ export type UserProfile = {
   email: string;
   image: string | null;
   hasPassword: boolean;
-  hasGoogle: boolean;
   emailVerified: boolean;
 };
 
@@ -57,7 +56,7 @@ export async function registerUser(
   if (existing) {
     return {
       ok: false,
-      error: "Este e-mail já está cadastrado. Entre ou use o Google.",
+      error: "Este e-mail já está cadastrado. Entre ou recupere o acesso.",
     };
   }
 
@@ -96,7 +95,7 @@ export async function resendVerificationEmail(
   if (!user?.passwordHash) {
     return {
       ok: false,
-      error: "Conta não encontrada ou cadastrada apenas com Google.",
+      error: "Conta não encontrada. Cadastre-se com e-mail e senha.",
     };
   }
   if (user.emailVerified) {
@@ -124,9 +123,6 @@ export async function getUserProfile(): Promise<UserProfile> {
   const userId = await requireUserId();
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    include: {
-      accounts: { select: { provider: true } },
-    },
   });
 
   return {
@@ -135,7 +131,6 @@ export async function getUserProfile(): Promise<UserProfile> {
     email: user.email,
     image: user.image,
     hasPassword: Boolean(user.passwordHash),
-    hasGoogle: user.accounts.some((a) => a.provider === "google"),
     emailVerified: Boolean(user.emailVerified),
   };
 }
@@ -163,7 +158,7 @@ export async function updateUserProfile(data: {
     if (!user.passwordHash) {
       return {
         ok: false,
-        error: "Contas Google não permitem alterar o e-mail aqui.",
+        error: "Defina uma senha no perfil antes de alterar o e-mail.",
       };
     }
     if (!data.currentPassword) {
