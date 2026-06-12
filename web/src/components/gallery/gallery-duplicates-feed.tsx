@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import {
   formatOfficialCode,
   selectionForNumber,
+  stickerCount,
   stickerDisplayName,
   type Selection,
 } from "@/data/selections";
