@@ -2,7 +2,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { BookOpenCheck, LayoutGrid, Sparkles } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
-import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,7 +44,7 @@ export default function HomePage() {
               </div>
               <p className="text-sm text-muted">
                 {TOTAL_STICKERS} figurinhas no álbum Panini — use sem conta ou entre
-                com Google para sincronizar e trocar repetidas.
+                com e-mail e senha para sincronizar e trocar repetidas.
               </p>
             </div>
 
@@ -146,8 +145,8 @@ export default function HomePage() {
               Pronto para trocar o caderno pelo app?
             </h2>
             <p className="text-lg text-muted">
-              Use sem conta ou entre com Google para sincronizar na nuvem e
-              compartilhar repetidas com amigos.
+              Use sem conta ou crie uma conta com e-mail e senha para sincronizar
+              na nuvem e compartilhar repetidas com amigos.
             </p>
             <Button asChild className="min-h-14 rounded-2xl px-10 text-lg shadow-[var(--shadow-glow-gold)]">
               <Link href="/album">Começar meu álbum</Link>
@@ -157,7 +156,6 @@ export default function HomePage() {
       </main>
 
       <SiteFooter />
-      <GoogleOneTap />
     </div>
   );
 }

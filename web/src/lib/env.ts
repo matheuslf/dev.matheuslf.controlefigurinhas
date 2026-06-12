@@ -16,24 +16,16 @@ export const authUrl =
   process.env.NEXT_PUBLIC_URL ??
   "http://localhost:3000";
 
-export const googleClientId =
-  process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID;
-
-export const googleClientSecret =
-  process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET;
-
 export const resendApiKey = process.env.RESEND_API_KEY;
 export const emailFrom = process.env.EMAIL_FROM;
-
-export const publicGoogleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
 export function assertAuthEnv() {
   if (!authSecret) {
     console.warn("[auth] AUTH_SECRET (ou AUTHJS_SECRET) não configurado.");
   }
-  if (!googleClientId || !googleClientSecret) {
+  if (!resendApiKey || !emailFrom) {
     console.warn(
-      "[auth] Google OAuth não configurado. Use AUTH_GOOGLE_ID/AUTH_GOOGLE_SECRET ou GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET.",
+      "[auth] Confirmação de e-mail não configurada. Use RESEND_API_KEY e EMAIL_FROM.",
     );
   }
   if (!databaseUrl) {

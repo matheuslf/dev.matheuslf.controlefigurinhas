@@ -25,9 +25,16 @@ Com as variáveis ausentes, o app continua só com armazenamento local (comporta
 
 ## Checklist Panini (verso)
 
-Ordem global **1–980** e códigos **FWC**, **BRA**, **00** (logo), etc. seguem o checklist público [Scanini](https://scanini.app/albums/world-cup-2026). Confira com o verso das figurinhas ou com o material oficial Panini.
+**1010 figurinhas** na ordem física do álbum:
 
-Persistência: chave `localStorage` **`figurinhas-copa-2026-owned-v2`** (incompatível com a v1 após o alinhamento oficial).
+1. Logo Panini (`00`) + História da Copa (`FWC` 1–19)
+2. **Grupos A–L** — 48 seleções (20 figurinhas cada, código no verso ex. `MEX 1`, `BRA 7`)
+3. **LEG** 1–16 — Lendas históricas
+4. **COC** 1–14 — Craques Coca-Cola
+
+Códigos do verso (`BRA 7`, `LEG 5`, `COC 10`) permanecem como no material Panini; apenas a posição global no checklist (1–1010) segue a ordem dos grupos.
+
+Persistência local: chave **`figurinhas-copa-2026-v4`**. Coleções salvas na v3 (ordem Scanini) são remapeadas automaticamente por código do verso.
 
 ## Documentação do produto
 

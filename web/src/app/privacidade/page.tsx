@@ -27,8 +27,7 @@ export default function PrivacyPolicyPage() {
         <ul>
           <li>
             <strong>Dados de conta:</strong> nome, endereço de e-mail, foto de
-            perfil (quando disponibilizados pelo provedor de login, como Google)
-            e identificador interno da conta.
+            perfil e identificador interno da conta.
           </li>
           <li>
             <strong>Dados de autenticação:</strong> informações necessárias para
@@ -90,7 +89,7 @@ export default function PrivacyPolicyPage() {
           </li>
           <li>
             <strong>Consentimento:</strong> quando exigido, por exemplo para
-            login via terceiros ou comunicações opcionais;
+            comunicações opcionais;
           </li>
           <li>
             <strong>Legítimo interesse:</strong> para segurança, prevenção a
@@ -115,7 +114,7 @@ export default function PrivacyPolicyPage() {
           </li>
           <li>
             <strong>Com provedores de serviço:</strong> hospedagem, banco de
-            dados, autenticação (por exemplo, Google), envio de e-mail e
+            dados, envio de e-mail de confirmação e
             infraestrutura técnica, sempre na medida necessária para operar o
             serviço.
           </li>

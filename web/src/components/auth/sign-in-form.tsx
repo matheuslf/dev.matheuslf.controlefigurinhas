@@ -1,9 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { getProviders, signIn } from "next-auth/react";
+import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { normalizeCallbackUrl } from "@/lib/auth-callback-url";
 import {
@@ -41,13 +40,6 @@ export function SignInForm({
   );
   const [showResendVerification, setShowResendVerification] =
     React.useState(false);
-  const [providers, setProviders] = React.useState<Record<string, unknown> | null>(
-    null,
-  );
-
-  React.useEffect(() => {
-    getProviders().then(setProviders);
-  }, []);
 
   React.useEffect(() => {
     if (initialError) {
@@ -55,9 +47,6 @@ export function SignInForm({
       setMessageTone("error");
     }
   }, [initialError]);
-
-  const hasGoogle = Boolean(providers?.google);
-  const hasCredentials = Boolean(providers?.credentials);
 
   function clearMessage() {
     setMessage(null);
@@ -71,24 +60,8 @@ export function SignInForm({
     setConfirmPassword("");
   }
 
-  async function handleGoogle() {
-    if (!hasGoogle) {
-      setMessageTone("error");
-      setMessage("Google OAuth não configurado no servidor.");
-      return;
-    }
-    setLoading("google");
-    await signIn("google", { callbackUrl: redirectTo });
-  }
-
   async function handleCredentialsLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!hasCredentials) {
-      setMessageTone("error");
-      setMessage("Login por e-mail e senha indisponível.");
-      return;
-    }
-
     setLoading("login");
     clearMessage();
 
@@ -190,18 +163,6 @@ export function SignInForm({
     }
   }
 
-  if (providers === null) {
-    return <p className="py-4 text-center text-sm text-muted">Carregando…</p>;
-  }
-
-  if (!hasGoogle && !hasCredentials) {
-    return (
-      <p className="py-4 text-center text-sm text-destructive">
-        Nenhum método de login configurado.
-      </p>
-    );
-  }
-
   return (
     <div className="flex w-full max-w-sm flex-col items-center gap-5">
       <div className="grid w-full grid-cols-2 gap-1 rounded-lg bg-card-muted p-1">
@@ -229,22 +190,7 @@ export function SignInForm({
         </button>
       </div>
 
-      {hasGoogle && (
-        <GoogleSignInButton
-          onClick={handleGoogle}
-          disabled={loading !== null}
-          loading={loading === "google"}
-        />
-      )}
-
-      {hasGoogle && hasCredentials && (
-        <div className="relative w-full text-center text-sm text-muted">
-          <span className="bg-card px-2">ou</span>
-          <div className="absolute inset-x-0 top-1/2 -z-10 border-t border-border" />
-        </div>
-      )}
-
-      {hasCredentials && mode === "login" && (
+      {mode === "login" && (
         <form onSubmit={handleCredentialsLogin} className="flex w-full flex-col gap-3">
           <label className="flex flex-col gap-2 text-sm font-medium">
             E-mail
@@ -278,7 +224,7 @@ export function SignInForm({
         </form>
       )}
 
-      {hasCredentials && mode === "register" && (
+      {mode === "register" && (
         <form onSubmit={handleRegister} className="flex w-full flex-col gap-3">
           <label className="flex flex-col gap-2 text-sm font-medium">
             Nome
@@ -351,7 +297,7 @@ export function SignInForm({
         </p>
       )}
 
-      {showResendVerification && mode === "login" && hasCredentials && (
+      {showResendVerification && mode === "login" && (
         <Button
           type="button"
           variant="outline"

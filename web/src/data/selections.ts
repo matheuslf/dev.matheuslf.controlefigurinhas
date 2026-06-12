@@ -1,13 +1,17 @@
 /**
- * Álbum oficial Panini — Copa do Mundo 2026 (980 figurinhas).
+ * Álbum oficial Panini — Copa do Mundo 2026 (1010 figurinhas).
  *
- * Estrutura alinhada à checklist pública Scanini (códigos do verso, ex. `ARG 10`, `FWC 3`, `00`):
- * https://scanini.app/albums/world-cup-2026
- *
- * Ordem = posição 1–980 no checklist (logo Panini `00`, bloco FWC, depois as 48 seleções na ordem do álbum/Scanini).
- * Confira sempre com o verso das suas figurinhas ou o PDF oficial Panini.
+ * Ordem física do álbum: Logo `00` + FWC → Grupos A–L → LEG 1–16 → COC 1–14.
+ * Códigos do verso (ex. `BRA 7`, `LEG 3`, `COC 10`) permanecem como no material Panini.
  */
-export const TOTAL_STICKERS = 980;
+import {
+  cocaColaPlayerForLocal,
+  searchCocaColaPlayers,
+} from "@/data/coca-cola-players";
+
+export const TOTAL_STICKERS = 1010;
+
+export type AlbumSectionKind = "intro" | "teams" | "legends" | "coca-cola";
 
 export type Selection = {
   id: string;
@@ -16,78 +20,245 @@ export type Selection = {
   versoPrefix: string;
   startNumber: number;
   endNumber: number;
+  albumSection: AlbumSectionKind;
+  /** Grupo A–L; ausente em intro, LEG e COC */
+  worldCupGroup?: string;
 };
+
+type TeamDef = {
+  id: string;
+  name: string;
+  versoPrefix: string;
+};
+
+const TEAMS: Record<string, TeamDef> = {
+  MEX: { id: "mexico", name: "México", versoPrefix: "MEX" },
+  RSA: { id: "africa-do-sul", name: "África do Sul", versoPrefix: "RSA" },
+  KOR: { id: "coreia-do-sul", name: "Coreia do Sul", versoPrefix: "KOR" },
+  CZE: { id: "chequia", name: "Chéquia", versoPrefix: "CZE" },
+  CAN: { id: "canada", name: "Canadá", versoPrefix: "CAN" },
+  BIH: {
+    id: "bosnia-herzegovina",
+    name: "Bósnia e Herzegovina",
+    versoPrefix: "BIH",
+  },
+  QAT: { id: "catar", name: "Catar", versoPrefix: "QAT" },
+  SUI: { id: "suica", name: "Suíça", versoPrefix: "SUI" },
+  BRA: { id: "brasil", name: "Brasil", versoPrefix: "BRA" },
+  MAR: { id: "marrocos", name: "Marrocos", versoPrefix: "MAR" },
+  HAI: { id: "haiti", name: "Haiti", versoPrefix: "HAI" },
+  SCO: { id: "escocia", name: "Escócia", versoPrefix: "SCO" },
+  USA: { id: "estados-unidos", name: "Estados Unidos", versoPrefix: "USA" },
+  PAR: { id: "paraguai", name: "Paraguai", versoPrefix: "PAR" },
+  AUS: { id: "australia", name: "Austrália", versoPrefix: "AUS" },
+  TUR: { id: "turquia", name: "Turquia", versoPrefix: "TUR" },
+  GER: { id: "alemanha", name: "Alemanha", versoPrefix: "GER" },
+  CUW: { id: "curacao", name: "Curaçao", versoPrefix: "CUW" },
+  CIV: { id: "costa-do-marfim", name: "Costa do Marfim", versoPrefix: "CIV" },
+  ECU: { id: "equador", name: "Equador", versoPrefix: "ECU" },
+  NED: { id: "holanda", name: "Holanda", versoPrefix: "NED" },
+  JPN: { id: "japao", name: "Japão", versoPrefix: "JPN" },
+  SWE: { id: "suecia", name: "Suécia", versoPrefix: "SWE" },
+  TUN: { id: "tunisia", name: "Tunísia", versoPrefix: "TUN" },
+  BEL: { id: "belgica", name: "Bélgica", versoPrefix: "BEL" },
+  EGY: { id: "egito", name: "Egito", versoPrefix: "EGY" },
+  IRN: { id: "ira", name: "Irã", versoPrefix: "IRN" },
+  NZL: { id: "nova-zelandia", name: "Nova Zelândia", versoPrefix: "NZL" },
+  ESP: { id: "espanha", name: "Espanha", versoPrefix: "ESP" },
+  CPV: { id: "cabo-verde", name: "Cabo Verde", versoPrefix: "CPV" },
+  KSA: { id: "arabia-saudita", name: "Arábia Saudita", versoPrefix: "KSA" },
+  URU: { id: "uruguai", name: "Uruguai", versoPrefix: "URU" },
+  FRA: { id: "franca", name: "França", versoPrefix: "FRA" },
+  SEN: { id: "senegal", name: "Senegal", versoPrefix: "SEN" },
+  IRQ: { id: "iraque", name: "Iraque", versoPrefix: "IRQ" },
+  NOR: { id: "noruega", name: "Noruega", versoPrefix: "NOR" },
+  ARG: { id: "argentina", name: "Argentina", versoPrefix: "ARG" },
+  ALG: { id: "argelia", name: "Argélia", versoPrefix: "ALG" },
+  AUT: { id: "austria", name: "Áustria", versoPrefix: "AUT" },
+  JOR: { id: "jordania", name: "Jordânia", versoPrefix: "JOR" },
+  POR: { id: "portugal", name: "Portugal", versoPrefix: "POR" },
+  COD: {
+    id: "rd-congo",
+    name: "República Democrática do Congo",
+    versoPrefix: "COD",
+  },
+  UZB: { id: "uzbequistao", name: "Uzbequistão", versoPrefix: "UZB" },
+  COL: { id: "colombia", name: "Colômbia", versoPrefix: "COL" },
+  ENG: { id: "inglaterra", name: "Inglaterra", versoPrefix: "ENG" },
+  CRO: { id: "croacia", name: "Croácia", versoPrefix: "CRO" },
+  GHA: { id: "gana", name: "Gana", versoPrefix: "GHA" },
+  PAN: { id: "panama", name: "Panamá", versoPrefix: "PAN" },
+};
+
+export type WorldCupGroup = {
+  id: string;
+  name: string;
+  letter: string;
+  selectionIds: string[];
+};
+
+export const WORLD_CUP_GROUPS: readonly WorldCupGroup[] = [
+  {
+    id: "group-a",
+    name: "Grupo A",
+    letter: "A",
+    selectionIds: ["mexico", "africa-do-sul", "coreia-do-sul", "chequia"],
+  },
+  {
+    id: "group-b",
+    name: "Grupo B",
+    letter: "B",
+    selectionIds: ["canada", "bosnia-herzegovina", "catar", "suica"],
+  },
+  {
+    id: "group-c",
+    name: "Grupo C",
+    letter: "C",
+    selectionIds: ["brasil", "marrocos", "haiti", "escocia"],
+  },
+  {
+    id: "group-d",
+    name: "Grupo D",
+    letter: "D",
+    selectionIds: [
+      "estados-unidos",
+      "paraguai",
+      "australia",
+      "turquia",
+    ],
+  },
+  {
+    id: "group-e",
+    name: "Grupo E",
+    letter: "E",
+    selectionIds: ["alemanha", "curacao", "costa-do-marfim", "equador"],
+  },
+  {
+    id: "group-f",
+    name: "Grupo F",
+    letter: "F",
+    selectionIds: ["holanda", "japao", "suecia", "tunisia"],
+  },
+  {
+    id: "group-g",
+    name: "Grupo G",
+    letter: "G",
+    selectionIds: ["belgica", "egito", "ira", "nova-zelandia"],
+  },
+  {
+    id: "group-h",
+    name: "Grupo H",
+    letter: "H",
+    selectionIds: ["espanha", "cabo-verde", "arabia-saudita", "uruguai"],
+  },
+  {
+    id: "group-i",
+    name: "Grupo I",
+    letter: "I",
+    selectionIds: ["franca", "senegal", "iraque", "noruega"],
+  },
+  {
+    id: "group-j",
+    name: "Grupo J",
+    letter: "J",
+    selectionIds: ["argentina", "argelia", "austria", "jordania"],
+  },
+  {
+    id: "group-k",
+    name: "Grupo K",
+    letter: "K",
+    selectionIds: [
+      "portugal",
+      "rd-congo",
+      "uzbequistao",
+      "colombia",
+    ],
+  },
+  {
+    id: "group-l",
+    name: "Grupo L",
+    letter: "L",
+    selectionIds: ["inglaterra", "croacia", "gana", "panama"],
+  },
+] as const;
+
+const GROUP_PREFIXES: readonly (readonly string[])[] = [
+  ["MEX", "RSA", "KOR", "CZE"],
+  ["CAN", "BIH", "QAT", "SUI"],
+  ["BRA", "MAR", "HAI", "SCO"],
+  ["USA", "PAR", "AUS", "TUR"],
+  ["GER", "CUW", "CIV", "ECU"],
+  ["NED", "JPN", "SWE", "TUN"],
+  ["BEL", "EGY", "IRN", "NZL"],
+  ["ESP", "CPV", "KSA", "URU"],
+  ["FRA", "SEN", "IRQ", "NOR"],
+  ["ARG", "ALG", "AUT", "JOR"],
+  ["POR", "COD", "UZB", "COL"],
+  ["ENG", "CRO", "GHA", "PAN"],
+];
 
 type SectionDef = {
   id: string;
   name: string;
   versoPrefix: string;
   count: number;
+  albumSection: AlbumSectionKind;
+  worldCupGroup?: string;
 };
 
-/** Ordem = índice global 1–980 (Scanini / álbum). */
-const SECTIONS: readonly SectionDef[] = [
-  { id: "logo-panini", name: "Logo Panini", versoPrefix: "00", count: 1 },
-  {
-    id: "historia-copa",
-    name: "História da Copa do Mundo",
-    versoPrefix: "FWC",
-    count: 19,
-  },
-  { id: "argelia", name: "Argélia", versoPrefix: "ALG", count: 20 },
-  { id: "argentina", name: "Argentina", versoPrefix: "ARG", count: 20 },
-  { id: "australia", name: "Austrália", versoPrefix: "AUS", count: 20 },
-  { id: "austria", name: "Áustria", versoPrefix: "AUT", count: 20 },
-  { id: "belgica", name: "Bélgica", versoPrefix: "BEL", count: 20 },
-  {
-    id: "bosnia-herzegovina",
-    name: "Bósnia e Herzegovina",
-    versoPrefix: "BIH",
-    count: 20,
-  },
-  { id: "brasil", name: "Brasil", versoPrefix: "BRA", count: 20 },
-  { id: "canada", name: "Canadá", versoPrefix: "CAN", count: 20 },
-  { id: "costa-do-marfim", name: "Costa do Marfim", versoPrefix: "CIV", count: 20 },
-  { id: "rd-congo", name: "República Democrática do Congo", versoPrefix: "COD", count: 20 },
-  { id: "colombia", name: "Colômbia", versoPrefix: "COL", count: 20 },
-  { id: "cabo-verde", name: "Cabo Verde", versoPrefix: "CPV", count: 20 },
-  { id: "croacia", name: "Croácia", versoPrefix: "CRO", count: 20 },
-  { id: "curacao", name: "Curaçao", versoPrefix: "CUW", count: 20 },
-  { id: "chequia", name: "Chéquia", versoPrefix: "CZE", count: 20 },
-  { id: "equador", name: "Equador", versoPrefix: "ECU", count: 20 },
-  { id: "egito", name: "Egito", versoPrefix: "EGY", count: 20 },
-  { id: "inglaterra", name: "Inglaterra", versoPrefix: "ENG", count: 20 },
-  { id: "espanha", name: "Espanha", versoPrefix: "ESP", count: 20 },
-  { id: "franca", name: "França", versoPrefix: "FRA", count: 20 },
-  { id: "alemanha", name: "Alemanha", versoPrefix: "GER", count: 20 },
-  { id: "gana", name: "Gana", versoPrefix: "GHA", count: 20 },
-  { id: "haiti", name: "Haiti", versoPrefix: "HAI", count: 20 },
-  { id: "ira", name: "Irã", versoPrefix: "IRN", count: 20 },
-  { id: "iraque", name: "Iraque", versoPrefix: "IRQ", count: 20 },
-  { id: "jordania", name: "Jordânia", versoPrefix: "JOR", count: 20 },
-  { id: "japao", name: "Japão", versoPrefix: "JPN", count: 20 },
-  { id: "coreia-do-sul", name: "Coreia do Sul", versoPrefix: "KOR", count: 20 },
-  { id: "arabia-saudita", name: "Arábia Saudita", versoPrefix: "KSA", count: 20 },
-  { id: "marrocos", name: "Marrocos", versoPrefix: "MAR", count: 20 },
-  { id: "mexico", name: "México", versoPrefix: "MEX", count: 20 },
-  { id: "holanda", name: "Holanda", versoPrefix: "NED", count: 20 },
-  { id: "noruega", name: "Noruega", versoPrefix: "NOR", count: 20 },
-  { id: "nova-zelandia", name: "Nova Zelândia", versoPrefix: "NZL", count: 20 },
-  { id: "panama", name: "Panamá", versoPrefix: "PAN", count: 20 },
-  { id: "paraguai", name: "Paraguai", versoPrefix: "PAR", count: 20 },
-  { id: "portugal", name: "Portugal", versoPrefix: "POR", count: 20 },
-  { id: "catar", name: "Catar", versoPrefix: "QAT", count: 20 },
-  { id: "africa-do-sul", name: "África do Sul", versoPrefix: "RSA", count: 20 },
-  { id: "escocia", name: "Escócia", versoPrefix: "SCO", count: 20 },
-  { id: "senegal", name: "Senegal", versoPrefix: "SEN", count: 20 },
-  { id: "suica", name: "Suíça", versoPrefix: "SUI", count: 20 },
-  { id: "suecia", name: "Suécia", versoPrefix: "SWE", count: 20 },
-  { id: "tunisia", name: "Tunísia", versoPrefix: "TUN", count: 20 },
-  { id: "turquia", name: "Turquia", versoPrefix: "TUR", count: 20 },
-  { id: "uruguai", name: "Uruguai", versoPrefix: "URU", count: 20 },
-  { id: "estados-unidos", name: "Estados Unidos", versoPrefix: "USA", count: 20 },
-  { id: "uzbequistao", name: "Uzbequistão", versoPrefix: "UZB", count: 20 },
-] as const;
+function buildSectionDefs(): SectionDef[] {
+  const out: SectionDef[] = [
+    {
+      id: "logo-panini",
+      name: "Logo Panini",
+      versoPrefix: "00",
+      count: 1,
+      albumSection: "intro",
+    },
+    {
+      id: "historia-copa",
+      name: "História da Copa do Mundo",
+      versoPrefix: "FWC",
+      count: 19,
+      albumSection: "intro",
+    },
+  ];
+
+  GROUP_PREFIXES.forEach((prefixes, index) => {
+    const group = WORLD_CUP_GROUPS[index];
+    for (const prefix of prefixes) {
+      const team = TEAMS[prefix];
+      out.push({
+        id: team.id,
+        name: team.name,
+        versoPrefix: team.versoPrefix,
+        count: 20,
+        albumSection: "teams",
+        worldCupGroup: group.letter,
+      });
+    }
+  });
+
+  out.push({
+    id: "lendas",
+    name: "Grandes Campeões e Momentos Históricos",
+    versoPrefix: "LEG",
+    count: 16,
+    albumSection: "legends",
+  });
+
+  out.push({
+    id: "coca-cola",
+    name: "Craques Coca-Cola",
+    versoPrefix: "COC",
+    count: 14,
+    albumSection: "coca-cola",
+  });
+
+  return out;
+}
+
+const SECTIONS: readonly SectionDef[] = buildSectionDefs();
 
 function buildSelections(): Selection[] {
   let n = 1;
@@ -99,6 +270,8 @@ function buildSelections(): Selection[] {
       versoPrefix: s.versoPrefix,
       startNumber: n,
       endNumber: n + s.count - 1,
+      albumSection: s.albumSection,
+      worldCupGroup: s.worldCupGroup,
     });
     n += s.count;
   }
@@ -116,6 +289,8 @@ const PREFIX_TO_SELECTION = new Map(
   SELECTIONS.map((s) => [s.versoPrefix.toUpperCase(), s]),
 );
 
+const SELECTION_BY_ID = new Map(SELECTIONS.map((s) => [s.id, s]));
+
 export function selectionForNumber(num: number): Selection | undefined {
   return SELECTIONS.find((s) => num >= s.startNumber && num <= s.endNumber);
 }
@@ -123,6 +298,15 @@ export function selectionForNumber(num: number): Selection | undefined {
 export function stickersForSelection(sel: Selection): number[] {
   const len = sel.endNumber - sel.startNumber + 1;
   return Array.from({ length: len }, (_, i) => sel.startNumber + i);
+}
+
+export function worldCupGroupForSelection(sel: Selection): WorldCupGroup | undefined {
+  if (!sel.worldCupGroup) return undefined;
+  return WORLD_CUP_GROUPS.find((g) => g.letter === sel.worldCupGroup);
+}
+
+export function albumSectionForNumber(num: number): AlbumSectionKind | undefined {
+  return selectionForNumber(num)?.albumSection;
 }
 
 /** Número local no verso (1–20 nas seleções; 1 no logo `00`; 1–19 em FWC). */
@@ -133,7 +317,7 @@ export function localNumberForGlobal(
   return globalNumber - sel.startNumber + 1;
 }
 
-/** Texto como no verso / Scanini (ex.: `BRA 7`, `FWC 3`, `00`). */
+/** Texto como no verso (ex.: `BRA 7`, `FWC 3`, `00`). */
 export function formatOfficialCode(
   sel: Selection,
   globalNumber: number,
@@ -143,18 +327,74 @@ export function formatOfficialCode(
   return `${sel.versoPrefix} ${local}`;
 }
 
+export function stickerDisplayName(
+  sel: Selection,
+  globalNumber: number,
+): string {
+  if (sel.versoPrefix === "COC") {
+    const player = cocaColaPlayerForLocal(localNumberForGlobal(sel, globalNumber));
+    return player?.name ?? sel.name;
+  }
+  return sel.name;
+}
+
 export function stickerCount(sel: Selection): number {
   return sel.endNumber - sel.startNumber + 1;
 }
 
+export type AlbumSectionGroup = {
+  sectionId: string;
+  sectionLabel: string;
+  albumSection: AlbumSectionKind;
+  worldCupGroup?: string;
+  selectionIds: string[];
+};
+
+/** Ordem de exibição: Intro → Grupos A–L → Lendas → Coca-Cola. */
+export const ALBUM_SECTION_GROUPS: readonly AlbumSectionGroup[] = [
+  {
+    sectionId: "intro",
+    sectionLabel: "Introdução",
+    albumSection: "intro",
+    selectionIds: ["logo-panini", "historia-copa"],
+  },
+  ...WORLD_CUP_GROUPS.map((g) => ({
+    sectionId: g.id,
+    sectionLabel: g.name,
+    albumSection: "teams" as const,
+    worldCupGroup: g.letter,
+    selectionIds: g.selectionIds,
+  })),
+  {
+    sectionId: "legends",
+    sectionLabel: "Lendas históricas",
+    albumSection: "legends",
+    selectionIds: ["lendas"],
+  },
+  {
+    sectionId: "coca-cola",
+    sectionLabel: "Coca-Cola",
+    albumSection: "coca-cola",
+    selectionIds: ["coca-cola"],
+  },
+];
+
+export function selectionsForAlbumSection(
+  section: AlbumSectionGroup,
+): Selection[] {
+  return section.selectionIds
+    .map((id) => SELECTION_BY_ID.get(id))
+    .filter((s): s is Selection => s != null);
+}
+
 /**
- * Resolve busca: posição no checklist (1–980), código `00`, ou `FWC 3` / `ARG 10` (espaço opcional).
+ * Resolve busca: posição no checklist (1–1010), código `00`, ou `FWC 3` / `ARG 10` (espaço opcional).
  */
 export function parseStickerQuery(raw: string): number | null {
   const q = raw.trim();
   if (!q) return null;
 
-  if (/^\d{1,3}$/.test(q)) {
+  if (/^\d{1,4}$/.test(q)) {
     const n = Number.parseInt(q, 10);
     if (n >= 1 && n <= TOTAL_STICKERS) return n;
     return null;
@@ -259,6 +499,17 @@ export function resolveAlbumFilter(
         exactSticker: null,
       };
     }
+  }
+
+  const cocaLocals = searchCocaColaPlayers(q);
+  if (cocaLocals.length > 0) {
+    const coc = PREFIX_TO_SELECTION.get("COC")!;
+    const numbers = cocaLocals.map((local) => coc.startNumber + local - 1);
+    return {
+      selectionId: "coca-cola",
+      numbers,
+      exactSticker: numbers.length === 1 ? numbers[0] : null,
+    };
   }
 
   const matched = SELECTIONS.filter((s) => {
