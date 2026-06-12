@@ -13,6 +13,10 @@ import {
   createAndSendVerificationEmail,
   isEmailPendingVerification,
 } from "@/lib/email-verification";
+import {
+  requestPasswordResetForEmail,
+  resetPasswordByToken,
+} from "@/lib/password-reset";
 
 export type AuthActionResult =
   | { ok: true; needsEmailVerification?: boolean }
@@ -117,6 +121,29 @@ export async function checkEmailPendingVerification(
   email: string,
 ): Promise<boolean> {
   return isEmailPendingVerification(email);
+}
+
+export async function requestPasswordReset(
+  email: string,
+): Promise<AuthActionResult> {
+  const result = await requestPasswordResetForEmail(email);
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  return { ok: true };
+}
+
+export async function resetPasswordByTokenAction(
+  token: string,
+  newPassword: string,
+): Promise<AuthActionResult> {
+  const result = await resetPasswordByToken(token, newPassword);
+  if (!result.ok) {
+    return { ok: false, error: result.error };
+  }
+
+  return { ok: true };
 }
 
 export async function getUserProfile(): Promise<UserProfile> {
