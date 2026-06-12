@@ -26,13 +26,14 @@ import { PublishedDuplicatesGrouped } from "@/components/published-duplicates-gr
 import { SelectionFlag } from "@/components/selection-flag";
 import { DuplicateEditor } from "@/components/duplicate-editor";
 import {
-  SELECTIONS,
+  ALBUM_SECTION_GROUPS,
   TOTAL_STICKERS,
   formatOfficialCode,
   resolveAlbumFilter,
   selectionForNumber,
   stickerCount,
   stickersForSelection,
+  selectionsForAlbumSection,
   type Selection,
 } from "@/data/selections";
 import { useStickerCollection } from "@/hooks/use-sticker-collection";
@@ -431,40 +432,63 @@ export function AlbumClient() {
               )}
             </TabsContent>
 
-            <TabsContent value="teams">
-              <div className="grid gap-4 sm:grid-cols-2">
-                {SELECTIONS.map((sel) => {
-                  const { got, total, pct } = selectionProgress(sel);
-                  return (
-                    <Card key={sel.id} className="shadow-sm">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-start gap-3">
-                          <SelectionFlag selection={sel} size="sm" />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-start justify-between gap-2">
-                              <CardTitle className="text-base font-semibold">
-                                {sel.name}
-                              </CardTitle>
-                              <Badge variant="secondary" className="tabular-nums">
-                                {got}/{total}
-                              </Badge>
-                            </div>
-                            <CardDescription className="tabular-nums">
-                              {sel.versoPrefix === "00"
-                                ? "Código 00 (foil)"
-                                : `${sel.versoPrefix} 1 — ${sel.versoPrefix} ${stickerCount(sel)}`}
-                            </CardDescription>
-                          </div>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <Progress value={pct} className="h-2.5" />
-                        <p className="mt-2 text-sm text-muted">{pct}% completo</p>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
+            <TabsContent value="teams" className="flex flex-col gap-8">
+              {ALBUM_SECTION_GROUPS.map((section) => {
+                const selections = selectionsForAlbumSection(section);
+                if (selections.length === 0) return null;
+
+                return (
+                  <div key={section.sectionId} className="flex flex-col gap-4">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-foreground sm:text-base">
+                      {section.sectionLabel}
+                    </h2>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {selections.map((sel) => {
+                        const { got, total, pct } = selectionProgress(sel);
+                        return (
+                          <Card key={sel.id} className="shadow-sm">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-start gap-3">
+                                <SelectionFlag selection={sel} size="sm" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <CardTitle className="text-base font-semibold">
+                                      {sel.name}
+                                    </CardTitle>
+                                    <Badge
+                                      variant="secondary"
+                                      className="tabular-nums"
+                                    >
+                                      {got}/{total}
+                                    </Badge>
+                                  </div>
+                                  <CardDescription className="tabular-nums">
+                                    {sel.versoPrefix === "00"
+                                      ? "Código 00 (foil)"
+                                      : sel.versoPrefix === "FWC"
+                                        ? "FWC 1–19"
+                                        : sel.versoPrefix === "LEG"
+                                          ? "LEG 1–16"
+                                          : sel.versoPrefix === "COC"
+                                            ? "COC 1–14"
+                                            : `${sel.versoPrefix} 1 — ${sel.versoPrefix} ${stickerCount(sel)}`}
+                                  </CardDescription>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <Progress value={pct} className="h-2.5" />
+                              <p className="mt-2 text-sm text-muted">
+                                {pct}% completo
+                              </p>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
             </TabsContent>
 
             <TabsContent value="duplicates" className="space-y-4">

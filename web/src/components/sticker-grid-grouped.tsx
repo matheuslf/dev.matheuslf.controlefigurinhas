@@ -9,8 +9,10 @@ import {
   localNumberForGlobal,
   selectionForNumber,
   stickerCount,
+  stickerDisplayName,
+  type Selection,
 } from "@/data/selections";
-import { groupNumbersBySelection } from "@/lib/sticker-groups";
+import { groupNumbersByAlbumHierarchy } from "@/lib/sticker-groups";
 import type { StickerState } from "@/lib/sticker-storage";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +33,15 @@ type StickerCellProps = {
   onEditDuplicate: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
 };
 
+function selectionSubtitle(selection: Selection): string {
+  const total = stickerCount(selection);
+  if (selection.versoPrefix === "00") return "Código 00 (foil)";
+  if (selection.versoPrefix === "FWC") return "História da Copa — FWC 1–19";
+  if (selection.versoPrefix === "LEG") return "LEG 1–16 — Lendas históricas";
+  if (selection.versoPrefix === "COC") return "COC 1–14 — Craques Coca-Cola";
+  return `${selection.versoPrefix} 1 — ${selection.versoPrefix} ${total}`;
+}
+
 function StickerCell({
   num,
   state,
@@ -47,6 +58,8 @@ function StickerCell({
 
   const isLogo = sel.versoPrefix === "00";
   const local = localNumberForGlobal(sel, num);
+  const playerName =
+    sel.versoPrefix === "COC" ? stickerDisplayName(sel, num) : null;
 
   function clearClickTimer() {
     if (clickTimer.current) {
@@ -133,6 +146,11 @@ function StickerCell({
           <span className="text-base font-bold leading-none sm:text-lg">
             {local}
           </span>
+          {playerName && (
+            <span className="line-clamp-2 px-0.5 text-[7px] font-medium leading-tight opacity-90 sm:text-[8px]">
+              {playerName}
+            </span>
+          )}
         </>
       )}
       <span
@@ -147,6 +165,76 @@ function StickerCell({
   );
 }
 
+function SelectionGridBlock({
+  selection,
+  groupNums,
+  owned,
+  getState,
+  onToggle,
+  onEditDuplicate,
+  flash,
+}: {
+  selection: Selection;
+  groupNums: number[];
+  owned: Set<number>;
+  getState: (num: number) => StickerState;
+  onToggle: (num: number) => void;
+  onEditDuplicate: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
+  flash: number | null;
+}) {
+  const total = stickerCount(selection);
+  const got = groupNums.filter((n) => owned.has(n)).length;
+  const pct = total > 0 ? Math.round((got / total) * 1000) / 10 : 0;
+  const isCountry =
+    selection.albumSection === "teams";
+
+  return (
+    <section className="scroll-mt-36">
+      <header className="sticky top-14 z-20 -mx-1 mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background/95 px-3 py-2.5 backdrop-blur-md sm:top-[4.5rem] sm:px-4">
+        <SelectionFlag selection={selection} size="md" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold text-foreground sm:text-lg">
+              {selection.name}
+            </h3>
+            <Badge variant="secondary" className="tabular-nums">
+              {got}/{total}
+            </Badge>
+          </div>
+          <p className="text-xs text-muted sm:text-sm">
+            {selectionSubtitle(selection)}
+            {isCountry && (
+              <span className="hidden sm:inline">
+                {" "}
+                · #{selection.startNumber}–{selection.endNumber}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="hidden w-28 sm:block">
+          <Progress value={pct} className="h-2" />
+          <p className="mt-1 text-right text-xs tabular-nums text-muted">
+            {pct}%
+          </p>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
+        {groupNums.map((num) => (
+          <StickerCell
+            key={num}
+            num={num}
+            state={getState(num)}
+            flash={flash}
+            onToggle={onToggle}
+            onEditDuplicate={onEditDuplicate}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function StickerGridGrouped({
   numbers,
   owned,
@@ -155,69 +243,32 @@ export function StickerGridGrouped({
   onEditDuplicate,
   flash,
 }: StickerGridGroupedProps) {
-  const groups = React.useMemo(
-    () => groupNumbersBySelection(numbers),
+  const hierarchy = React.useMemo(
+    () => groupNumbersByAlbumHierarchy(numbers),
     [numbers],
   );
 
   return (
-    <div className="flex flex-col gap-8">
-      {groups.map(({ selection, numbers: groupNums }) => {
-        const total = stickerCount(selection);
-        const got = groupNums.filter((n) => owned.has(n)).length;
-        const pct = total > 0 ? Math.round((got / total) * 1000) / 10 : 0;
-        const isCountry = selection.versoPrefix !== "00" && selection.versoPrefix !== "FWC";
-
-        return (
-          <section key={selection.id} className="scroll-mt-36">
-            <header className="sticky top-14 z-20 -mx-1 mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-background/95 px-3 py-2.5 backdrop-blur-md sm:top-[4.5rem] sm:px-4">
-              <SelectionFlag selection={selection} size="md" />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-semibold text-foreground sm:text-lg">
-                    {selection.name}
-                  </h3>
-                  <Badge variant="secondary" className="tabular-nums">
-                    {got}/{total}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted sm:text-sm">
-                  {selection.versoPrefix === "00"
-                    ? "Código 00 (foil)"
-                    : selection.versoPrefix === "FWC"
-                      ? "História da Copa — FWC 1–19"
-                      : `${selection.versoPrefix} 1 — ${selection.versoPrefix} ${total}`}
-                  {isCountry && (
-                    <span className="hidden sm:inline">
-                      {" "}
-                      · #{selection.startNumber}–{selection.endNumber}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <div className="hidden w-28 sm:block">
-                <Progress value={pct} className="h-2" />
-                <p className="mt-1 text-right text-xs tabular-nums text-muted">
-                  {pct}%
-                </p>
-              </div>
-            </header>
-
-            <div className="grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12">
-              {groupNums.map((num) => (
-                <StickerCell
-                  key={num}
-                  num={num}
-                  state={getState(num)}
-                  flash={flash}
-                  onToggle={onToggle}
-                  onEditDuplicate={onEditDuplicate}
-                />
-              ))}
-            </div>
-          </section>
-        );
-      })}
+    <div className="flex flex-col gap-10">
+      {hierarchy.map((section) => (
+        <div key={section.sectionId} className="flex flex-col gap-8">
+          <h2 className="sticky top-14 z-[15] -mx-1 rounded-lg border border-border bg-background/95 px-3 py-2 text-sm font-bold uppercase tracking-wide text-foreground backdrop-blur-md sm:top-[4.5rem] sm:text-base">
+            {section.sectionLabel}
+          </h2>
+          {section.selections.map(({ selection, numbers: groupNums }) => (
+            <SelectionGridBlock
+              key={selection.id}
+              selection={selection}
+              groupNums={groupNums}
+              owned={owned}
+              getState={getState}
+              onToggle={onToggle}
+              onEditDuplicate={onEditDuplicate}
+              flash={flash}
+            />
+          ))}
+        </div>
+      ))}
     </div>
   );
 }

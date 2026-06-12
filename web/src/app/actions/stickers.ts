@@ -3,6 +3,10 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { TOTAL_STICKERS } from "@/data/selections";
+import {
+  isLegacyStickerCollection,
+  migrateStickerRows,
+} from "@/lib/sticker-number-migration";
 import type { StickerState } from "@/lib/sticker-storage";
 
 async function requireUserId() {
@@ -11,9 +15,9 @@ async function requireUserId() {
   return session.user.id;
 }
 
-export async function getMyStickers(): Promise<Record<number, StickerState>> {
-  const userId = await requireUserId();
-  const rows = await prisma.userSticker.findMany({ where: { userId } });
+function rowsToRecord(
+  rows: { stickerNumber: number; owned: boolean; duplicateCount: number }[],
+): Record<number, StickerState> {
   const out: Record<number, StickerState> = {};
   for (const row of rows) {
     if (row.stickerNumber >= 1 && row.stickerNumber <= TOTAL_STICKERS) {
@@ -24,6 +28,94 @@ export async function getMyStickers(): Promise<Record<number, StickerState>> {
     }
   }
   return out;
+}
+
+async function maybeMigrateUserStickers(userId: string) {
+  const rows = await prisma.userSticker.findMany({ where: { userId } });
+  if (rows.length === 0) return rows;
+
+  const stickerRows = rows.map((row) => ({
+    stickerNumber: row.stickerNumber,
+    owned: row.owned,
+    duplicateCount: row.duplicateCount,
+  }));
+
+  if (!isLegacyStickerCollection(stickerRows)) return rows;
+
+  const migrated = migrateStickerRows(stickerRows);
+  const migratedNums = new Set(migrated.map((r) => r.stickerNumber));
+  const oldNums = rows.map((r) => r.stickerNumber);
+
+  await prisma.$transaction([
+    ...oldNums
+      .filter((n) => !migratedNums.has(n))
+      .map((stickerNumber) =>
+        prisma.userSticker.deleteMany({ where: { userId, stickerNumber } }),
+      ),
+    ...migrated.map((row) =>
+      prisma.userSticker.upsert({
+        where: {
+          userId_stickerNumber: { userId, stickerNumber: row.stickerNumber },
+        },
+        create: {
+          userId,
+          stickerNumber: row.stickerNumber,
+          owned: row.owned,
+          duplicateCount: row.duplicateCount,
+        },
+        update: {
+          owned: row.owned,
+          duplicateCount: row.duplicateCount,
+        },
+      }),
+    ),
+  ]);
+
+  const pendingTrades = await prisma.tradeRequest.findMany({
+    where: {
+      status: "PENDING",
+      stickerNumber: { lte: 980 },
+      OR: [{ requesterId: userId }, { targetUserId: userId }],
+    },
+    select: { id: true, stickerNumber: true },
+  });
+
+  const tradeUpdates = pendingTrades
+    .map((trade) => {
+      const migratedNum = migrateStickerRows([
+        {
+          stickerNumber: trade.stickerNumber,
+          owned: true,
+          duplicateCount: 0,
+        },
+      ])[0]?.stickerNumber;
+      if (migratedNum == null || migratedNum === trade.stickerNumber) {
+        return null;
+      }
+      return prisma.tradeRequest.update({
+        where: { id: trade.id },
+        data: { stickerNumber: migratedNum },
+      });
+    })
+    .filter((op): op is NonNullable<typeof op> => op != null);
+
+  if (tradeUpdates.length > 0) {
+    await prisma.$transaction(tradeUpdates);
+  }
+
+  return migrated.map((row) => ({
+    id: "",
+    userId,
+    stickerNumber: row.stickerNumber,
+    owned: row.owned,
+    duplicateCount: row.duplicateCount,
+  }));
+}
+
+export async function getMyStickers(): Promise<Record<number, StickerState>> {
+  const userId = await requireUserId();
+  const rows = await maybeMigrateUserStickers(userId);
+  return rowsToRecord(rows);
 }
 
 export async function upsertStickers(
@@ -83,18 +175,30 @@ export async function mergeLocalStickers(
   localData: Record<number, StickerState>,
   strategy: "union" | "local" | "remote",
 ): Promise<Record<number, StickerState>> {
-  await requireUserId();
+  const userId = await requireUserId();
   const remote = await getMyStickers();
+
+  const localRows = Object.entries(localData).map(([num, state]) => ({
+    stickerNumber: Number(num),
+    owned: state.owned,
+    duplicateCount: state.duplicateCount,
+  }));
+
+  const migratedLocal = isLegacyStickerCollection(localRows)
+    ? migrateStickerRows(localRows)
+    : localRows;
+
+  const migratedLocalRecord = rowsToRecord(migratedLocal);
 
   let merged: Record<number, StickerState>;
 
   if (strategy === "local") {
-    merged = localData;
+    merged = migratedLocalRecord;
   } else if (strategy === "remote") {
     merged = remote;
   } else {
     merged = { ...remote };
-    for (const [key, state] of Object.entries(localData)) {
+    for (const [key, state] of Object.entries(migratedLocalRecord)) {
       const num = Number(key);
       const existing = merged[num];
       merged[num] = {

@@ -1,7 +1,13 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { SELECTIONS, TOTAL_STICKERS, stickerCount } from "@/data/selections";
+import {
+  ALBUM_SECTION_GROUPS,
+  SELECTIONS,
+  TOTAL_STICKERS,
+  selectionsForAlbumSection,
+  stickerCount,
+} from "@/data/selections";
 import { cn } from "@/lib/utils";
 
 const ALL = "all";
@@ -28,6 +34,16 @@ export function AlbumFilterBar({
   onSearchChange,
   className,
 }: AlbumFilterBarProps) {
+  const groupedSelections = ALBUM_SECTION_GROUPS.map((section) => ({
+    section,
+    selections: selectionsForAlbumSection(section),
+  })).filter((g) => g.selections.length > 0);
+
+  const listedIds = new Set(
+    groupedSelections.flatMap((g) => g.selections.map((s) => s.id)),
+  );
+  const unlisted = SELECTIONS.filter((s) => !listedIds.has(s.id));
+
   return (
     <Card
       className={cn(
@@ -47,11 +63,24 @@ export function AlbumFilterBar({
               aria-label="Filtrar por seleção"
             >
               <option value={ALL}>Todas ({TOTAL_STICKERS})</option>
-              {SELECTIONS.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({stickerCount(s)})
-                </option>
+              {groupedSelections.map(({ section, selections }) => (
+                <optgroup key={section.sectionId} label={section.sectionLabel}>
+                  {selections.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({stickerCount(s)})
+                    </option>
+                  ))}
+                </optgroup>
               ))}
+              {unlisted.length > 0 && (
+                <optgroup label="Outras">
+                  {unlisted.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({stickerCount(s)})
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
           <label className="flex min-w-0 flex-1 flex-col gap-2 text-sm font-medium text-foreground sm:max-w-md">
@@ -61,7 +90,7 @@ export function AlbumFilterBar({
               inputMode="search"
               autoCapitalize="characters"
               autoComplete="off"
-              placeholder="Ex: 42, BRA ou BRA 7"
+              placeholder="Ex: 42, BRA 7, LEG 5, Kane"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               className={cn(inputClassName, "max-sm:order-1")}

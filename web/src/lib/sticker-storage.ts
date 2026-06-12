@@ -1,4 +1,8 @@
 import { TOTAL_STICKERS } from "@/data/selections";
+import {
+  isLegacyStickerCollection,
+  migrateStickerRows,
+} from "@/lib/sticker-number-migration";
 
 export type StickerState = {
   owned: boolean;
@@ -9,6 +13,7 @@ export type StickerCollection = Map<number, StickerState>;
 
 const STORAGE_V2 = "figurinhas-copa-2026-owned-v2";
 export const STORAGE_V3 = "figurinhas-copa-2026-v3";
+export const STORAGE_V4 = "figurinhas-copa-2026-v4";
 
 type StoredV3 = Record<string, { o?: number; d?: number }>;
 
@@ -20,23 +25,63 @@ export function emptyCollection(): StickerCollection {
   return new Map();
 }
 
+function parseStoredCollection(raw: StoredV3): StickerCollection {
+  const map = emptyCollection();
+  for (const [key, val] of Object.entries(raw)) {
+    const num = Number(key);
+    if (!Number.isInteger(num)) continue;
+    map.set(num, {
+      owned: val.o === 1,
+      duplicateCount: Math.max(0, val.d ?? 0),
+    });
+  }
+  return map;
+}
+
+function migrateStoredCollection(map: StickerCollection): StickerCollection {
+  const rows = [...map.entries()].map(([stickerNumber, state]) => ({
+    stickerNumber,
+    owned: state.owned,
+    duplicateCount: state.duplicateCount,
+  }));
+
+  if (!isLegacyStickerCollection(rows)) {
+    const out = emptyCollection();
+    for (const [num, state] of map) {
+      if (clampSticker(num)) out.set(num, state);
+    }
+    return out;
+  }
+
+  const migrated = migrateStickerRows(rows);
+  const out = emptyCollection();
+  for (const row of migrated) {
+    if (!clampSticker(row.stickerNumber)) continue;
+    out.set(row.stickerNumber, {
+      owned: row.owned,
+      duplicateCount: row.duplicateCount,
+    });
+  }
+  return out;
+}
+
 export function loadFromStorage(): StickerCollection {
   if (typeof window === "undefined") return emptyCollection();
 
   try {
+    const v4 = localStorage.getItem(STORAGE_V4);
+    if (v4) {
+      const parsed = JSON.parse(v4) as StoredV3;
+      return parseStoredCollection(parsed);
+    }
+
     const v3 = localStorage.getItem(STORAGE_V3);
     if (v3) {
       const parsed = JSON.parse(v3) as StoredV3;
-      const map = emptyCollection();
-      for (const [key, val] of Object.entries(parsed)) {
-        const num = Number(key);
-        if (!clampSticker(num)) continue;
-        map.set(num, {
-          owned: val.o === 1,
-          duplicateCount: Math.max(0, val.d ?? 0),
-        });
-      }
-      return map;
+      const migrated = migrateStoredCollection(parseStoredCollection(parsed));
+      persistToStorage(migrated);
+      localStorage.removeItem(STORAGE_V3);
+      return migrated;
     }
 
     const v2 = localStorage.getItem(STORAGE_V2);
@@ -45,13 +90,15 @@ export function loadFromStorage(): StickerCollection {
       const map = emptyCollection();
       if (Array.isArray(arr)) {
         for (const v of arr) {
-          if (typeof v === "number" && clampSticker(v)) {
+          if (typeof v === "number") {
             map.set(v, { owned: true, duplicateCount: 0 });
           }
         }
       }
-      persistToStorage(map);
-      return map;
+      const migrated = migrateStoredCollection(map);
+      persistToStorage(migrated);
+      localStorage.removeItem(STORAGE_V2);
+      return migrated;
     }
   } catch {
     /* ignore corrupt storage */
@@ -71,7 +118,8 @@ export function persistToStorage(collection: StickerCollection) {
       d: state.duplicateCount,
     };
   }
-  localStorage.setItem(STORAGE_V3, JSON.stringify(obj));
+  localStorage.setItem(STORAGE_V4, JSON.stringify(obj));
+  localStorage.removeItem(STORAGE_V3);
 }
 
 export function hasStickerData(
