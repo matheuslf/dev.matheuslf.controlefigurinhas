@@ -61,6 +61,7 @@ export function AlbumClient() {
     toggle,
     setDuplicateCount,
     getState,
+    isStickerPending,
     ready,
     ownedCount,
     percent,
@@ -248,6 +249,7 @@ export function AlbumClient() {
       <SiteHeader />
       {editDuplicate != null && (
         <DuplicateEditor
+          key={editDuplicate}
           stickerNumber={editDuplicate}
           label={
             selectionForNumber(editDuplicate)
@@ -259,6 +261,7 @@ export function AlbumClient() {
           }
           duplicateCount={getState(editDuplicate).duplicateCount}
           owned={getState(editDuplicate).owned}
+          pending={isStickerPending(editDuplicate)}
           onSave={(count) => setDuplicateCount(editDuplicate, count)}
           onClose={() => setEditDuplicate(null)}
         />
@@ -384,6 +387,7 @@ export function AlbumClient() {
                   numbers={visibleNumbers}
                   owned={listOwned}
                   getState={listGetState}
+                  isStickerPending={isMemberOnlyView ? undefined : isStickerPending}
                   onEditDuplicate={isMemberOnlyView ? undefined : openDuplicateEditor}
                 />
               )}
@@ -425,6 +429,7 @@ export function AlbumClient() {
                   numbers={visibleNumbers}
                   owned={owned}
                   getState={getState}
+                  isStickerPending={isStickerPending}
                   onToggle={toggle}
                   onEditDuplicate={openDuplicateEditor}
                   flash={flash}

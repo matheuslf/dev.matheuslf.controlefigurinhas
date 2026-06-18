@@ -6,6 +6,7 @@ import { TOTAL_STICKERS } from "@/data/selections";
 import {
   getMyStickers,
   mergeLocalStickers,
+  upsertSticker,
   upsertStickers,
 } from "@/app/actions/stickers";
 import {
@@ -21,6 +22,8 @@ import {
   type StickerState,
 } from "@/lib/sticker-storage";
 
+type SyncStatus = "idle" | "loading" | "saving" | "synced" | "offline";
+
 type StickerCollectionContextValue = {
   collection: StickerCollection;
   owned: Set<number>;
@@ -28,10 +31,11 @@ type StickerCollectionContextValue = {
   setDuplicateCount: (num: number, count: number) => void;
   replaceCollection: (next: StickerCollection) => void;
   getState: (num: number) => StickerState;
+  isStickerPending: (num: number) => boolean;
   ready: boolean;
   ownedCount: number;
   percent: number;
-  syncStatus: "idle" | "loading" | "saving" | "synced" | "offline";
+  syncStatus: SyncStatus;
 };
 
 const StickerCollectionContext =
@@ -59,65 +63,143 @@ export function StickerCollectionProvider({
 }) {
   const { data: session, status } = useSession();
   const userId = session?.user?.id;
+  const isAuthenticated = status === "authenticated";
 
   const [collection, setCollection] = React.useState<StickerCollection | null>(
     null,
   );
-  const [syncStatus, setSyncStatus] = React.useState<
-    "idle" | "loading" | "saving" | "synced" | "offline"
-  >("idle");
+  const [syncStatus, setSyncStatus] = React.useState<SyncStatus>("idle");
+  const [pendingStickers, setPendingStickers] = React.useState<Set<number>>(
+    () => new Set(),
+  );
 
-  const syncTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const cloudSyncedUserId = React.useRef<string | null>(null);
-  const cloudLoadInFlight = React.useRef<string | null>(null);
-  const isSaving = React.useRef(false);
+  const cloudLoadId = React.useRef(0);
+  const collectionRef = React.useRef<StickerCollection>(emptyCollection());
+  const sessionStatusRef = React.useRef(status);
+  const stickerSaveGen = React.useRef<Map<number, number>>(new Map());
+  const pendingRef = React.useRef<Set<number>>(new Set());
 
-  const scheduleSync = React.useCallback(
-    (next: StickerCollection) => {
-      if (status !== "authenticated") {
+  sessionStatusRef.current = status;
+
+  const addPending = React.useCallback((nums: Iterable<number>) => {
+    for (const num of nums) pendingRef.current.add(num);
+    setPendingStickers((prev) => {
+      const next = new Set(prev);
+      for (const num of nums) next.add(num);
+      return next;
+    });
+  }, []);
+
+  const removePending = React.useCallback((nums: Iterable<number>) => {
+    for (const num of nums) pendingRef.current.delete(num);
+    setPendingStickers((prev) => {
+      const next = new Set(prev);
+      for (const num of nums) next.delete(num);
+      return next;
+    });
+  }, []);
+
+  const updateSyncStatus = React.useCallback(() => {
+    if (pendingRef.current.size > 0) {
+      setSyncStatus("saving");
+    } else {
+      setSyncStatus("synced");
+    }
+  }, []);
+
+  const hasUnsyncedChanges = React.useCallback(() => {
+    return pendingRef.current.size > 0;
+  }, []);
+
+  const saveStickerImmediately = React.useCallback(
+    (num: number, state: StickerState) => {
+      if (sessionStatusRef.current !== "authenticated") {
         setSyncStatus("offline");
         return;
       }
-      if (syncTimer.current) clearTimeout(syncTimer.current);
 
+      const gen = (stickerSaveGen.current.get(num) ?? 0) + 1;
+      stickerSaveGen.current.set(num, gen);
+      addPending([num]);
       setSyncStatus("saving");
-      isSaving.current = true;
 
-      syncTimer.current = setTimeout(async () => {
-        try {
-          await upsertStickers(
-            Array.from(next.entries()).map(([stickerNumber, state]) => ({
-              stickerNumber,
-              owned: state.owned,
-              duplicateCount: state.duplicateCount,
-            })),
-          );
-          setSyncStatus("synced");
-        } catch {
-          setSyncStatus("offline");
-        } finally {
-          isSaving.current = false;
-        }
-      }, 500);
+      void upsertSticker(num, state)
+        .then(() => {
+          if (stickerSaveGen.current.get(num) !== gen) return;
+          removePending([num]);
+          updateSyncStatus();
+        })
+        .catch(() => {
+          if (stickerSaveGen.current.get(num) !== gen) return;
+          removePending([num]);
+          setSyncStatus(pendingRef.current.size > 0 ? "saving" : "offline");
+        });
     },
-    [status],
+    [addPending, removePending, updateSyncStatus],
   );
 
   const applyCollection = React.useCallback(
     (
       next: StickerCollection,
-      options?: { pushToCloud?: boolean; syncStatus?: typeof syncStatus },
+      options?: { pushToCloud?: boolean; syncStatus?: SyncStatus },
     ) => {
-      persistToStorage(next);
+      collectionRef.current = next;
+      if (!isAuthenticated) {
+        persistToStorage(next);
+      }
       setCollection(next);
       if (options?.syncStatus) {
         setSyncStatus(options.syncStatus);
       }
-      if (options?.pushToCloud) {
-        scheduleSync(next);
+      if (options?.pushToCloud && isAuthenticated) {
+        const batch = Array.from(next.entries()).map(([stickerNumber, state]) => ({
+          stickerNumber,
+          owned: state.owned,
+          duplicateCount: state.duplicateCount,
+        }));
+        if (batch.length === 0) return;
+
+        for (const num of batch.map((item) => item.stickerNumber)) {
+          addPending([num]);
+        }
+        setSyncStatus("saving");
+
+        void upsertStickers(batch)
+          .then(() => {
+            removePending(batch.map((item) => item.stickerNumber));
+            updateSyncStatus();
+          })
+          .catch(() => {
+            removePending(batch.map((item) => item.stickerNumber));
+            setSyncStatus("offline");
+          });
       }
     },
-    [scheduleSync],
+    [isAuthenticated, addPending, removePending, updateSyncStatus],
+  );
+
+  const commitStickerChange = React.useCallback(
+    (num: number, state: StickerState) => {
+      const next = new Map(collectionRef.current);
+      if (!state.owned && state.duplicateCount === 0) {
+        next.delete(num);
+      } else {
+        next.set(num, state);
+      }
+
+      collectionRef.current = next;
+      setCollection(next);
+
+      if (sessionStatusRef.current !== "authenticated") {
+        persistToStorage(next);
+        setSyncStatus("offline");
+        return;
+      }
+
+      saveStickerImmediately(num, state);
+    },
+    [saveStickerImmediately],
   );
 
   React.useEffect(() => {
@@ -128,27 +210,28 @@ export function StickerCollectionProvider({
 
     if (status === "unauthenticated") {
       cloudSyncedUserId.current = null;
-      cloudLoadInFlight.current = null;
+      cloudLoadId.current += 1;
+      stickerSaveGen.current.clear();
+      pendingRef.current.clear();
+      setPendingStickers(new Set());
       setCollection(loadFromStorage());
       setSyncStatus("offline");
       return;
     }
 
     if (!userId) {
-      setCollection((prev) => prev ?? loadFromStorage());
+      setCollection((prev) => prev ?? emptyCollection());
       return;
     }
 
-    if (
-      cloudSyncedUserId.current === userId ||
-      cloudLoadInFlight.current === userId
-    ) {
+    if (cloudSyncedUserId.current === userId) {
+      setCollection((prev) => prev ?? emptyCollection());
       return;
     }
 
-    cloudLoadInFlight.current = userId;
+    const loadId = ++cloudLoadId.current;
     setSyncStatus("loading");
-    let cancelled = false;
+    setCollection((prev) => prev ?? emptyCollection());
 
     void (async () => {
       try {
@@ -160,34 +243,39 @@ export function StickerCollectionProvider({
           remote = await fetchCloudStickers();
         }
 
-        if (cancelled) return;
+        if (loadId !== cloudLoadId.current) return;
 
-        applyCollection(plainToCollection(remote), { syncStatus: "synced" });
+        const cloudCollection = plainToCollection(remote);
+        collectionRef.current = cloudCollection;
+        setCollection(cloudCollection);
+        setSyncStatus("synced");
         cloudSyncedUserId.current = userId;
       } catch {
-        if (cancelled) return;
-        applyCollection(loadFromStorage(), { syncStatus: "offline" });
+        if (loadId !== cloudLoadId.current) return;
+        collectionRef.current = emptyCollection();
+        setCollection(emptyCollection());
+        setSyncStatus("offline");
         cloudSyncedUserId.current = userId;
-      } finally {
-        if (cloudLoadInFlight.current === userId) {
-          cloudLoadInFlight.current = null;
-        }
       }
     })();
 
     return () => {
-      cancelled = true;
+      cloudLoadId.current += 1;
     };
-  }, [status, userId, applyCollection]);
+  }, [status, userId]);
 
   React.useEffect(() => {
-    if (status !== "authenticated" || !userId) return;
+    if (!isAuthenticated || !userId) return;
 
     function refreshFromCloud() {
-      if (isSaving.current) return;
+      if (hasUnsyncedChanges()) return;
       void getMyStickers()
         .then((remote) => {
-          applyCollection(plainToCollection(remote), { syncStatus: "synced" });
+          if (hasUnsyncedChanges()) return;
+          const cloudCollection = plainToCollection(remote);
+          collectionRef.current = cloudCollection;
+          setCollection(cloudCollection);
+          setSyncStatus("synced");
         })
         .catch(() => setSyncStatus("offline"));
     }
@@ -202,52 +290,34 @@ export function StickerCollectionProvider({
       window.removeEventListener("focus", refreshFromCloud);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [status, userId, applyCollection]);
-
-  const update = React.useCallback(
-    (updater: (prev: StickerCollection) => StickerCollection) => {
-      setCollection((prev) => {
-        if (prev === null) return prev;
-        const next = updater(new Map(prev));
-        applyCollection(next, { pushToCloud: true });
-        return next;
-      });
-    },
-    [applyCollection],
-  );
+  }, [isAuthenticated, userId, hasUnsyncedChanges]);
 
   const toggleOwned = React.useCallback(
     (num: number) => {
       if (!clampSticker(num)) return;
-      update((prev) => {
-        const current = prev.get(num) ?? { owned: false, duplicateCount: 0 };
-        const next = new Map(prev);
-        if (current.owned) {
-          next.set(num, { owned: false, duplicateCount: 0 });
-        } else {
-          next.set(num, { ...current, owned: true });
-        }
-        return next;
-      });
+      const current =
+        collectionRef.current.get(num) ?? { owned: false, duplicateCount: 0 };
+      if (current.owned) {
+        commitStickerChange(num, { owned: false, duplicateCount: 0 });
+      } else {
+        commitStickerChange(num, { ...current, owned: true });
+      }
     },
-    [update],
+    [commitStickerChange],
   );
 
   const setDuplicateCount = React.useCallback(
     (num: number, duplicateCount: number) => {
       if (!clampSticker(num)) return;
       const count = Math.max(0, Math.floor(duplicateCount));
-      update((prev) => {
-        const current = prev.get(num) ?? { owned: false, duplicateCount: 0 };
-        const next = new Map(prev);
-        next.set(num, {
-          owned: current.owned || count > 0,
-          duplicateCount: count,
-        });
-        return next;
+      const current =
+        collectionRef.current.get(num) ?? { owned: false, duplicateCount: 0 };
+      commitStickerChange(num, {
+        owned: current.owned || count > 0,
+        duplicateCount: count,
       });
     },
-    [update],
+    [commitStickerChange],
   );
 
   const replaceCollection = React.useCallback(
@@ -278,6 +348,11 @@ export function StickerCollectionProvider({
     [resolved],
   );
 
+  const isStickerPending = React.useCallback(
+    (num: number) => pendingStickers.has(num),
+    [pendingStickers],
+  );
+
   const value = React.useMemo(
     () => ({
       collection: resolved,
@@ -286,6 +361,7 @@ export function StickerCollectionProvider({
       setDuplicateCount,
       replaceCollection,
       getState,
+      isStickerPending,
       ready,
       ownedCount: count,
       percent,
@@ -298,6 +374,7 @@ export function StickerCollectionProvider({
       setDuplicateCount,
       replaceCollection,
       getState,
+      isStickerPending,
       ready,
       count,
       percent,
