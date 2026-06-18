@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Loader2 } from "lucide-react";
 import { SelectionFlag } from "@/components/selection-flag";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,6 +19,7 @@ type StickerListGroupedProps = {
   numbers: number[];
   owned: Set<number>;
   getState: (num: number) => StickerState;
+  isStickerPending?: (num: number) => boolean;
   onEditDuplicate?: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
 };
 
@@ -33,10 +35,12 @@ function selectionSubtitle(selection: Selection): string {
 function BrowseChip({
   num,
   state,
+  pending,
   onEditDuplicate,
 }: {
   num: number;
   state: StickerState;
+  pending: boolean;
   onEditDuplicate?: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const sel = selectionForNumber(num);
@@ -58,13 +62,22 @@ function BrowseChip({
           : undefined
       }
       className={cn(
-        "flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1.5 text-center",
-        onEditDuplicate && "cursor-pointer active:scale-[0.98]",
+        "relative flex min-h-[3.25rem] flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1.5 text-center",
+        onEditDuplicate && !pending && "cursor-pointer active:scale-[0.98]",
+        pending && "opacity-80",
         state.owned
           ? "border-success/40 bg-success/10 text-foreground"
           : "border-border bg-card text-muted",
       )}
     >
+      {pending && (
+        <span
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/50"
+          aria-hidden
+        >
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+        </span>
+      )}
       <span
         className={cn(
           "text-xs font-bold leading-none sm:text-sm",
@@ -91,12 +104,14 @@ function SelectionBlock({
   groupNums,
   owned,
   getState,
+  isStickerPending,
   onEditDuplicate,
 }: {
   selection: Selection;
   groupNums: number[];
   owned: Set<number>;
   getState: (num: number) => StickerState;
+  isStickerPending?: (num: number) => boolean;
   onEditDuplicate?: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const total = stickerCount(selection);
@@ -129,6 +144,7 @@ function SelectionBlock({
             key={num}
             num={num}
             state={getState(num)}
+            pending={isStickerPending?.(num) ?? false}
             onEditDuplicate={onEditDuplicate}
           />
         ))}
@@ -141,6 +157,7 @@ export function StickerListGrouped({
   numbers,
   owned,
   getState,
+  isStickerPending,
   onEditDuplicate,
 }: StickerListGroupedProps) {
   const hierarchy = React.useMemo(
@@ -162,6 +179,7 @@ export function StickerListGrouped({
               groupNums={groupNums}
               owned={owned}
               getState={getState}
+              isStickerPending={isStickerPending}
               onEditDuplicate={onEditDuplicate}
             />
           ))}

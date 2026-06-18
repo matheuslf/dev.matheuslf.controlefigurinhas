@@ -118,6 +118,19 @@ export async function getMyStickers(): Promise<Record<number, StickerState>> {
   return rowsToRecord(rows);
 }
 
+export async function upsertSticker(
+  stickerNumber: number,
+  state: StickerState,
+) {
+  await upsertStickers([
+    {
+      stickerNumber,
+      owned: state.owned,
+      duplicateCount: state.duplicateCount,
+    },
+  ]);
+}
+
 export async function upsertStickers(
   batch: {
     stickerNumber: number;

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Loader2 } from "lucide-react";
 import { DuplicateBadge } from "@/components/duplicate-badge";
 import { SelectionFlag } from "@/components/selection-flag";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +21,7 @@ type StickerGridGroupedProps = {
   numbers: number[];
   owned: Set<number>;
   getState: (num: number) => StickerState;
+  isStickerPending?: (num: number) => boolean;
   onToggle: (num: number) => void;
   onEditDuplicate: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
   flash: number | null;
@@ -28,6 +30,7 @@ type StickerGridGroupedProps = {
 type StickerCellProps = {
   num: number;
   state: StickerState;
+  pending: boolean;
   flash: number | null;
   onToggle: (num: number) => void;
   onEditDuplicate: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
@@ -45,14 +48,15 @@ function selectionSubtitle(selection: Selection): string {
 function StickerCell({
   num,
   state,
+  pending,
   flash,
   onToggle,
   onEditDuplicate,
 }: StickerCellProps) {
   const sel = selectionForNumber(num);
-  const clickTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressTriggered = React.useRef(false);
+  const touchToggleHandled = React.useRef(false);
 
   if (!sel) return null;
 
@@ -61,13 +65,6 @@ function StickerCell({
   const playerName =
     sel.versoPrefix === "COC" ? stickerDisplayName(sel, num) : null;
 
-  function clearClickTimer() {
-    if (clickTimer.current) {
-      clearTimeout(clickTimer.current);
-      clickTimer.current = null;
-    }
-  }
-
   function clearLongPressTimer() {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
@@ -75,16 +72,16 @@ function StickerCell({
     }
   }
 
-  function handleClick() {
-    clearClickTimer();
-    clickTimer.current = setTimeout(() => {
-      clickTimer.current = null;
-      if (!longPressTriggered.current) onToggle(num);
-    }, 280);
+  function handleClick(e: React.MouseEvent) {
+    if (touchToggleHandled.current) {
+      touchToggleHandled.current = false;
+      return;
+    }
+    if (e.detail > 1) return;
+    if (!longPressTriggered.current) onToggle(num);
   }
 
   function handleDoubleClick(e: React.MouseEvent) {
-    clearClickTimer();
     clearLongPressTimer();
     longPressTriggered.current = false;
     onEditDuplicate(num, e);
@@ -95,13 +92,16 @@ function StickerCell({
     clearLongPressTimer();
     longPressTimer.current = setTimeout(() => {
       longPressTriggered.current = true;
-      clearClickTimer();
       onEditDuplicate(num, e);
     }, 500);
   }
 
   function handleTouchEnd() {
     clearLongPressTimer();
+    if (!longPressTriggered.current) {
+      touchToggleHandled.current = true;
+      onToggle(num);
+    }
     window.setTimeout(() => {
       longPressTriggered.current = false;
     }, 50);
@@ -109,7 +109,6 @@ function StickerCell({
 
   React.useEffect(
     () => () => {
-      clearClickTimer();
       clearLongPressTimer();
     },
     [],
@@ -131,10 +130,19 @@ function StickerCell({
         state.owned
           ? "border-success bg-success text-white shadow-[var(--shadow-1)]"
           : "border-border bg-card-muted text-foreground hover:border-primary/50",
+        pending && "pointer-events-none opacity-80",
         flash === num &&
           "ring-4 ring-primary ring-offset-2 ring-offset-background",
       )}
     >
+      {pending && (
+        <span
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-background/50 backdrop-blur-[1px]"
+          aria-hidden
+        >
+          <Loader2 className="h-5 w-5 animate-spin text-primary" />
+        </span>
+      )}
       <DuplicateBadge count={state.duplicateCount} />
       {isLogo ? (
         <span className="text-sm font-bold leading-none">00</span>
@@ -170,6 +178,7 @@ function SelectionGridBlock({
   groupNums,
   owned,
   getState,
+  isStickerPending,
   onToggle,
   onEditDuplicate,
   flash,
@@ -178,6 +187,7 @@ function SelectionGridBlock({
   groupNums: number[];
   owned: Set<number>;
   getState: (num: number) => StickerState;
+  isStickerPending?: (num: number) => boolean;
   onToggle: (num: number) => void;
   onEditDuplicate: (num: number, e: React.MouseEvent | React.TouchEvent) => void;
   flash: number | null;
@@ -225,6 +235,7 @@ function SelectionGridBlock({
             key={num}
             num={num}
             state={getState(num)}
+            pending={isStickerPending?.(num) ?? false}
             flash={flash}
             onToggle={onToggle}
             onEditDuplicate={onEditDuplicate}
@@ -239,6 +250,7 @@ export function StickerGridGrouped({
   numbers,
   owned,
   getState,
+  isStickerPending,
   onToggle,
   onEditDuplicate,
   flash,
@@ -262,6 +274,7 @@ export function StickerGridGrouped({
               groupNums={groupNums}
               owned={owned}
               getState={getState}
+              isStickerPending={isStickerPending}
               onToggle={onToggle}
               onEditDuplicate={onEditDuplicate}
               flash={flash}
